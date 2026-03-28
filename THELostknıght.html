@@ -9,7 +9,7 @@
 html,body{width:100%;height:100%;overflow:hidden}
 body{background:#0c0a14;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;overflow:hidden;font-family:monospace}
 
-/* crt kasa - tam ekrani kapla */
+
 .crt-kasa{
   position:absolute;top:0;left:0;right:0;bottom:0;
   background:#0c0a14;
@@ -17,7 +17,7 @@ body{background:#0c0a14;display:flex;flex-direction:column;align-items:center;ju
   overflow:hidden;
 }
 
-/* ekran cercevesi tam alan */
+
 .ekran-cerceve{
   position:relative;
   flex:1;
@@ -26,12 +26,12 @@ body{background:#0c0a14;display:flex;flex-direction:column;align-items:center;ju
   background:#000;
 }
 
-/* canvas ekrana sigdirilacak, oran korunacak */
+
 #oyun{
   display:block;
   image-rendering:pixelated;
   image-rendering:crisp-edges;
-  /* boyut js ile ayarlanacak */
+
 }
 
 .scanline-katman{
@@ -46,7 +46,7 @@ body{background:#0c0a14;display:flex;flex-direction:column;align-items:center;ju
   background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,0.25) 75%,rgba(0,0,0,0.6) 100%);
 }
 
-/* HUD - ekranin ustunde sabit */
+
 .hud{
   width:100%;
   display:flex;justify-content:space-between;align-items:center;
@@ -63,7 +63,7 @@ body{background:#0c0a14;display:flex;flex-direction:column;align-items:center;ju
 .hud .silah{color:#70b0e0;text-shadow:0 0 5px rgba(100,170,220,0.3)}
 .hud .blm{color:#48a0c8;text-shadow:0 0 5px rgba(72,160,200,0.3)}
 
-/* alt bar */
+
 .crt-alt{
   display:flex;justify-content:center;
   padding:4px 0 3px;
@@ -74,7 +74,7 @@ body{background:#0c0a14;display:flex;flex-direction:column;align-items:center;ju
   flex-shrink:0;
 }
 
-/* ses butonu */
+
 .ses-btn{
   position:fixed;top:10px;right:12px;z-index:20;
   width:32px;height:32px;border-radius:8px;
@@ -86,8 +86,8 @@ body{background:#0c0a14;display:flex;flex-direction:column;align-items:center;ju
 }
 .ses-btn:hover{background:rgba(255,255,255,0.15)}
 
-/* fullscreen butonu */
-.fs-btn{
+
+.fs-btn
   position:fixed;top:10px;right:52px;z-index:20;
   width:32px;height:32px;border-radius:8px;
   background:rgba(255,255,255,0.08);
@@ -98,7 +98,7 @@ body{background:#0c0a14;display:flex;flex-direction:column;align-items:center;ju
 }
 .fs-btn:hover{background:rgba(255,255,255,0.15)}
 
-/* mobil kontroller */
+
 .mobil-kontrol{display:none;position:fixed;bottom:8px;left:0;right:0;padding:0 16px;z-index:20}
 .mobil-satir{display:flex;justify-content:space-between}
 .mbtn{
@@ -138,31 +138,26 @@ body{background:#0c0a14;display:flex;flex-direction:column;align-items:center;ju
 </div></div>
 
 <script>
-// kayip sovalye v3 - boss update
-// hareketli platformlar, lav, hava durumu, silah sistemi, final boss
 var cnv=document.getElementById("oyun"),ctx=cnv.getContext("2d");
 var GEN=640,YUK=400,KARE=16,OLCEK=2,BO=KARE*OLCEK;
 
-// ===================== FULLSCREEN & RESIZE =====================
-// oyun icindeki mantik hep 640x400 uzerinden calisiyor
-// canvas css ile ekrana sigdirilacak, piksel orani korunacak
 
 function ekranBoyutAyarla() {
   var cerceve = document.querySelector(".ekran-cerceve");
   var ew = cerceve.clientWidth;
   var eh = cerceve.clientHeight;
 
-  // 640:400 = 1.6 oran
+
   var oyunOran = GEN / YUK;
   var ekranOran = ew / eh;
 
   var cizW, cizH;
   if (ekranOran > oyunOran) {
-    // ekran daha genis - yukseklige gore sigdir
+
     cizH = eh;
     cizW = eh * oyunOran;
   } else {
-    // ekran daha dar - genislige gore sigdir
+
     cizW = ew;
     cizH = ew / oyunOran;
   }
@@ -171,11 +166,11 @@ function ekranBoyutAyarla() {
   cnv.style.height = Math.floor(cizH) + "px";
 }
 
-// ilk ayar + pencere boyutu degisince
+
 ekranBoyutAyarla();
 window.addEventListener("resize", ekranBoyutAyarla);
 
-// fullscreen API
+
 var fsBtn = document.getElementById("fsBtn");
 fsBtn.addEventListener("click", function(e) {
   e.stopPropagation();
@@ -193,7 +188,7 @@ fsBtn.addEventListener("click", function(e) {
   }
 });
 
-// fullscreen degistiginde boyutu yeniden ayarla
+
 document.addEventListener("fullscreenchange", function() {
   setTimeout(ekranBoyutAyarla, 100);
   fsBtn.textContent = document.fullscreenElement ? "⊠" : "⛶";
@@ -203,12 +198,12 @@ document.addEventListener("webkitfullscreenchange", function() {
   fsBtn.textContent = document.webkitFullscreenElement ? "⊠" : "⛶";
 });
 
-// sprite olusturucu
+
 function sp(w,h,d){var c=document.createElement("canvas");c.width=w;c.height=h;var x=c.getContext("2d");for(var i=0;i<d.length;i++){x.fillStyle=d[i][2];x.fillRect(d[i][0],d[i][1],1,1)}return c}
 
-// ===================== SPRITE'LAR =====================
 
-// sovalye renkleri
+
+
 var TEN="#e8a870",TEN_G="#c88850",GOM="#2860c0",GOM_G="#1c4898",PAN="#1a3890",AYK="#381a08",KEM="#b89028",PEL="#a02828",PEL_G="#781818";
 
 function sovalyeCiz(poz){
