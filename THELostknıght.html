@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>the lost knight</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden}
+body{background:#0c0a14;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;overflow:hidden;font-family:monospace}
+
+/* crt kasa - tam ekrani kapla */
+.crt-kasa{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  background:#0c0a14;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+
+/* ekran cercevesi tam alan */
+.ekran-cerceve{
+  position:relative;
+  flex:1;
+  overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  background:#000;
+}
+
+/* canvas ekrana sigdirilacak, oran korunacak */
+#oyun{
+  display:block;
+  image-rendering:pixelated;
+  image-rendering:crisp-edges;
+  /* boyut js ile ayarlanacak */
+}
+
+.scanline-katman{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,0.12) 0px,rgba(0,0,0,0.12) 1px,transparent 1px,transparent 3px);
+  z-index:2;
+}
+.vignette-katman{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  pointer-events:none;z-index:3;
+  background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,0.25) 75%,rgba(0,0,0,0.6) 100%);
+}
+
+/* HUD - ekranin ustunde sabit */
+.hud{
+  width:100%;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 16px 6px;
+  font-size:14px;font-family:monospace;
+  z-index:10;
+  background:rgba(12,10,20,0.85);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  flex-shrink:0;
+  flex-wrap:wrap;gap:4px;
+}
+.hud .can{color:#d03838;text-shadow:0 0 5px rgba(208,56,56,0.4)}
+.hud .altin{color:#c8a828;text-shadow:0 0 5px rgba(200,168,40,0.3)}
+.hud .silah{color:#70b0e0;text-shadow:0 0 5px rgba(100,170,220,0.3)}
+.hud .blm{color:#48a0c8;text-shadow:0 0 5px rgba(72,160,200,0.3)}
+
+/* alt bar */
+.crt-alt{
+  display:flex;justify-content:center;
+  padding:4px 0 3px;
+  color:rgba(255,255,255,0.12);
+  font-size:9px;font-family:monospace;letter-spacing:3px;
+  background:rgba(12,10,20,0.85);
+  border-top:1px solid rgba(255,255,255,0.04);
+  flex-shrink:0;
+}
+
+/* ses butonu */
+.ses-btn{
+  position:fixed;top:10px;right:12px;z-index:20;
+  width:32px;height:32px;border-radius:8px;
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.18);
+  color:rgba(255,255,255,0.45);font-size:15px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);
+}
+.ses-btn:hover{background:rgba(255,255,255,0.15)}
+
+/* fullscreen butonu */
+.fs-btn{
+  position:fixed;top:10px;right:52px;z-index:20;
+  width:32px;height:32px;border-radius:8px;
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.18);
+  color:rgba(255,255,255,0.45);font-size:13px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);
+}
+.fs-btn:hover{background:rgba(255,255,255,0.15)}
+
+/* mobil kontroller */
+.mobil-kontrol{display:none;position:fixed;bottom:8px;left:0;right:0;padding:0 16px;z-index:20}
+.mobil-satir{display:flex;justify-content:space-between}
+.mbtn{
+  width:56px;height:56px;border-radius:12px;
+  background:rgba(255,255,255,0.07);
+  border:1px solid rgba(255,255,255,0.14);
+  color:rgba(255,255,255,0.45);font-size:20px;
+  display:flex;align-items:center;justify-content:center;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation;
+  backdrop-filter:blur(4px);
+}
+.mbtn:active{background:rgba(255,255,255,0.2)}
+.sol-grup,.sag-grup{display:flex;gap:6px}
+@media(hover:none)and(pointer:coarse){.mobil-kontrol{display:block}}
+</style>
+</head>
+<body>
+<div class="fs-btn" id="fsBtn" title="Fullscreen">⛶</div>
+<div class="ses-btn" id="sesBtn" title="Sound">♪</div>
+<div class="crt-kasa">
+<div class="hud">
+  <span class="can" id="canUI">♥♥♥</span>
+  <span class="silah" id="silahUI">⚔ sword</span>
+  <span class="altin" id="altinUI">0 gold</span>
+  <span class="blm" id="bolumUI">stage 1</span>
+</div>
+<div class="ekran-cerceve">
+  <canvas id="oyun" width="640" height="400"></canvas>
+  <div class="scanline-katman"></div>
+  <div class="vignette-katman"></div>
+</div>
+<div class="crt-alt">pixelvision ⬥ 1992</div>
+</div>
+<div class="mobil-kontrol"><div class="mobil-satir">
+  <div class="sol-grup"><div class="mbtn" id="btn-sol">◀</div><div class="mbtn" id="btn-sag">▶</div></div>
+  <div class="sag-grup"><div class="mbtn" id="btn-zipla">▲</div><div class="mbtn" id="btn-saldiri">⚔</div></div>
+</div></div>
+
+<script>
+// kayip sovalye v3 - boss update
+// hareketli platformlar, lav, hava durumu, silah sistemi, final boss
+var cnv=document.getElementById("oyun"),ctx=cnv.getContext("2d");
+var GEN=640,YUK=400,KARE=16,OLCEK=2,BO=KARE*OLCEK;
+
+// ===================== FULLSCREEN & RESIZE =====================
+// oyun icindeki mantik hep 640x400 uzerinden calisiyor
+// canvas css ile ekrana sigdirilacak, piksel orani korunacak
+
+function ekranBoyutAyarla() {
+  var cerceve = document.querySelector(".ekran-cerceve");
+  var ew = cerceve.clientWidth;
+  var eh = cerceve.clientHeight;
+
+  // 640:400 = 1.6 oran
+  var oyunOran = GEN / YUK;
+  var ekranOran = ew / eh;
+
+  var cizW, cizH;
+  if (ekranOran > oyunOran) {
+    // ekran daha genis - yukseklige gore sigdir
+    cizH = eh;
+    cizW = eh * oyunOran;
+  } else {
+    // ekran daha dar - genislige gore sigdir
+    cizW = ew;
+    cizH = ew / oyunOran;
+  }
+
+  cnv.style.width = Math.floor(cizW) + "px";
+  cnv.style.height = Math.floor(cizH) + "px";
+}
+
+// ilk ayar + pencere boyutu degisince
+ekranBoyutAyarla();
+window.addEventListener("resize", ekranBoyutAyarla);
+
+// fullscreen API
+var fsBtn = document.getElementById("fsBtn");
+fsBtn.addEventListener("click", function(e) {
+  e.stopPropagation();
+  var el = document.documentElement;
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    // tam ekrana gec
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    fsBtn.textContent = "⊠";
+  } else {
+    // tam ekrandan cik
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    fsBtn.textContent = "⛶";
+  }
+});
+
+// fullscreen degistiginde boyutu yeniden ayarla
+document.addEventListener("fullscreenchange", function() {
+  setTimeout(ekranBoyutAyarla, 100);
+  fsBtn.textContent = document.fullscreenElement ? "⊠" : "⛶";
+});
+document.addEventListener("webkitfullscreenchange", function() {
+  setTimeout(ekranBoyutAyarla, 100);
+  fsBtn.textContent = document.webkitFullscreenElement ? "⊠" : "⛶";
+});
+
+// sprite olusturucu
+function sp(w,h,d){var c=document.createElement("canvas");c.width=w;c.height=h;var x=c.getContext("2d");for(var i=0;i<d.length;i++){x.fillStyle=d[i][2];x.fillRect(d[i][0],d[i][1],1,1)}return c}
+
+// ===================== SPRITE'LAR =====================
+
+// sovalye renkleri
+var TEN="#e8a870",TEN_G="#c88850",GOM="#2860c0",GOM_G="#1c4898",PAN="#1a3890",AYK="#381a08",KEM="#b89028",PEL="#a02828",PEL_G="#781818";
+
+function sovalyeCiz(poz){
+  var p=[];
+  // kask
+  [[6,0],[7,0],[8,0],[9,0],[10,0],[11,0]].forEach(function(c){p.push([c[0],c[1],"#808898"])});
+  [[5,1],[6,1],[7,1],[8,1],[9,1],[10,1],[11,1],[12,1],[5,2],[12,2]].forEach(function(c){p.push([c[0],c[1],"#808898"])});
+  p.push([7,0,"#a0a8b8"],[8,0,"#b0b8c8"]);
+  // yuz
+  [[6,2],[7,2],[8,2],[9,2],[10,2],[11,2],[5,3],[6,3],[7,3],[8,3],[9,3],[10,3],[11,3],[12,3],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],[11,4],[12,4],[6,5],[7,5],[8,5],[9,5],[10,5],[11,5]].forEach(function(c){p.push([c[0],c[1],TEN])});
+  p.push([7,3,"#fff"],[8,3,"#fff"],[10,3,"#fff"],[11,3,"#fff"],[8,3,"#181818"],[10,3,"#181818"],[8,5,"#b06040"],[9,5,"#b06040"]);
+  // govde
+  [[6,6],[7,6],[8,6],[9,6],[10,6],[11,6],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],[5,8],[6,8],[7,8],[8,8],[9,8],[10,8],[11,8],[12,8],[5,9],[6,9],[7,9],[8,9],[9,9],[10,9],[11,9],[12,9],[6,10],[7,10],[8,10],[9,10],[10,10],[11,10]].forEach(function(c){p.push([c[0],c[1],GOM])});
+  p.push([5,7,GOM_G],[5,8,GOM_G],[5,9,GOM_G]);
+  for(var y=7;y<=9;y++)p.push([9,y,"#3878e0"]);
+  for(var x=6;x<=11;x++)p.push([x,10,KEM]);
+  p.push([8,10,"#d8b838"],[9,10,"#d8b838"]);
+  // pelerin
+  if(poz==1){p.push([13,6,PEL],[14,6,PEL],[15,7,PEL_G],[13,7,PEL],[14,7,PEL],[13,8,PEL],[14,8,PEL_G])}
+  else{p.push([13,7,PEL],[13,8,PEL],[13,9,PEL],[13,10,PEL],[14,8,PEL_G],[14,9,PEL_G])}
+  // kollar
+  if(poz==2||poz==3){[[4,5],[4,6],[3,4],[3,5],[13,5],[13,6],[14,4],[14,5]].forEach(function(c){p.push([c[0],c[1],TEN])})}
+  else{[[4,7],[4,8],[4,9],[3,9],[3,10]].forEach(function(c){p.push([c[0],c[1],TEN])});p.push([13,7,TEN],[13,8,TEN])}
+  // pantolon+bot
+  [[6,11],[7,11],[8,11],[9,11],[10,11],[5,12],[6,12],[7,12],[9,12],[10,12],[11,12],[5,13],[6,13],[10,13],[11,13]].forEach(function(c){p.push([c[0],c[1],PAN])});
+  [[4,14],[5,14],[6,14],[7,14],[9,14],[10,14],[11,14],[12,14],[4,15],[5,15],[6,15],[10,15],[11,15],[12,15]].forEach(function(c){p.push([c[0],c[1],AYK])});
+  if(poz==1){p.push([4,13,PAN],[3,14,AYK],[3,15,AYK],[12,12,PAN],[13,13,AYK])}
+  return sp(20,20,p);
+}
+var sovalyeK=[sovalyeCiz(0),sovalyeCiz(1),sovalyeCiz(2),sovalyeCiz(3)];
+
+// kilic sprite
+var kilicSp=sp(12,5,[[0,1,"#604020"],[0,2,"#604020"],[0,3,"#604020"],[1,1,"#705030"],[1,2,"#705030"],[1,3,"#705030"],[2,0,"#888"],[2,1,"#888"],[2,2,"#aaa"],[2,3,"#888"],[2,4,"#888"],[3,2,"#bbc"],[4,2,"#ccd"],[5,2,"#dde"],[6,2,"#eef"],[7,2,"#fff"],[8,2,"#fff"],[9,2,"#eef"],[10,2,"#dde"],[11,2,"#fff"],[3,1,"#99a"],[4,1,"#aab"],[5,1,"#bbc"],[6,1,"#ccd"],[7,1,"#dde"],[8,1,"#eef"],[3,3,"#99a"],[4,3,"#aab"],[5,3,"#bbc"],[6,3,"#ccd"],[7,3,"#dde"],[8,3,"#eef"]]);
+
+// ok sprite
+var okSp=sp(10,3,[[0,1,"#705030"],[1,1,"#806040"],[2,1,"#806040"],[3,1,"#806040"],[4,1,"#806040"],[5,1,"#806040"],[6,1,"#806040"],[7,1,"#aaa"],[8,1,"#ccc"],[9,0,"#ddd"],[9,1,"#eee"],[9,2,"#ddd"],[0,0,"#a03030"],[0,2,"#a03030"]]);
+
+// altin
+function altinCiz(f){var ws=[8,6,4,6],w=ws[f],p=[],b=Math.floor((8-w)/2);for(var y=0;y<8;y++)for(var x=0;x<w;x++){var k=(y==0||y==7||x==0||x==w-1);p.push([x+b,y,k?"#b08018":"#e8b830"])}if(w>5){p.push([b+Math.floor(w/2),2,"#907010"]);p.push([b+Math.floor(w/2),5,"#907010"])}return sp(8,8,p)}
+var altinK=[altinCiz(0),altinCiz(1),altinCiz(2),altinCiz(3)];
+
+// balcik
+function balcikCiz(ez){var p=[],boy=ez?7:9,ky=ez?2:0;for(var y=0;y<boy;y++){var s=y+ky,w;if(y<2)w=6+y*2;else if(y<boy-2)w=10;else w=10-(y-(boy-3));var b=Math.floor((10-w)/2);for(var x=0;x<w;x++){var kn=(y==0||x==0||x==w-1);p.push([x+b,s,kn?"#287828":(y<2?"#50c850":"#38a838")])}}var gy=ky+(ez?2:3);p.push([3,gy,"#fff"],[4,gy,"#fff"],[6,gy,"#fff"],[7,gy,"#fff"],[3,gy,"#181818"],[6,gy,"#181818"]);return sp(10,10,p)}
+var balcikK=[balcikCiz(false),balcikCiz(true)];
+
+// yarasa
+function yarasaCiz(up){var p=[],g="#483870",k="#6850a0";[[4,2],[5,2],[6,2],[4,3],[5,3],[6,3],[5,4]].forEach(function(c){p.push([c[0],c[1],g])});p.push([4,2,"#e02828"],[6,2,"#e02828"]);(up?[[2,0],[3,0],[7,0],[8,0],[1,1],[2,1],[3,1],[7,1],[8,1],[9,1]]:[[1,3],[2,3],[3,3],[7,3],[8,3],[9,3],[0,4],[1,4],[9,4],[10,4]]).forEach(function(c){p.push([c[0],c[1],k])});return sp(11,6,p)}
+var yarasaK=[yarasaCiz(true),yarasaCiz(false)];
+
+// diken
+var dikenSp=(function(){var p=[];for(var n=0;n<4;n++){var bx=n*4;for(var y=0;y<8;y++){var w=4-y;if(w<1)w=1;var ox=Math.floor((4-w)/2);for(var x=0;x<w;x++)p.push([bx+ox+x,15-y,y<2?"#707070":y<5?"#909090":"#c0c0c0"])}}return sp(16,16,p)})();
+
+// kalp
+var kalpSp=(function(){var p=[];[[1,0],[2,0],[4,0],[5,0],[0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[0,2],[1,2],[2,2],[3,2],[4,2],[5,2],[6,2],[1,3],[2,3],[3,3],[4,3],[5,3],[2,4],[3,4],[4,4],[3,5]].forEach(function(c){p.push([c[0],c[1],"#d03848"])});p.push([1,0,"#e86878"],[2,0,"#e86878"],[0,1,"#e86878"]);return sp(8,7,p)})();
+
+// silah pickup sprite'lari
+var kilicPickupSp=sp(10,10,(function(){var p=[];for(var y=3;y<=7;y++)p.push([5,y,"#dde"]);p.push([4,3,"#aab"],[6,3,"#aab"],[3,4,"#888"],[7,4,"#888"]);p.push([5,8,"#604020"],[5,9,"#604020"],[4,9,"#705030"],[6,9,"#705030"]);return p})());
+var okPickupSp=sp(10,10,(function(){var p=[];for(var x=1;x<=8;x++)p.push([x,5,"#806040"]);p.push([9,4,"#ccc"],[9,5,"#eee"],[9,6,"#ccc"]);p.push([0,4,"#a03030"],[0,5,"#a03030"],[0,6,"#a03030"]);p.push([1,4,"#806040"],[1,6,"#806040"]);return p})());
+
+// bayrak
+function bayrakCiz(t){var p=[];for(var y=0;y<16;y++)p.push([2,y,"#b0b0b0"]);for(var y=0;y<6;y++)for(var x=0;x<8;x++){var d=Math.round(Math.sin((x+t*0.15)*0.8)*0.6);p.push([3+x,1+y+d,((x+y+Math.floor(t/8))%4<2)?"#d03030":"#e0b030"])}return sp(12,17,p)}
+
+// ======== KARA SOVALYE (BOSS) ========
+// buyuk sprite - 24x24
+function bossCiz(poz,hasar){
+  var p=[];
+  var zrhR = hasar>60?"#600808":"#282828"; // hasar alinca zirh kizariyor
+  var zrhH = hasar>60?"#801010":"#383838";
+  var gozR = hasar>30?"#ff2020":"#e04040";
+  // kask - korkutucu, boynuzlu
+  [[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0]].forEach(function(c){p.push([c[0],c[1],zrhH])});
+  [[7,1],[8,1],[9,1],[10,1],[11,1],[12,1],[13,1],[14,1],[15,1],[16,1]].forEach(function(c){p.push([c[0],c[1],zrhR])});
+  // boynuzlar
+  p.push([6,0,"#555"],[5,0,"#666"],[4,1,"#777"],[17,0,"#555"],[18,0,"#666"],[19,1,"#777"]);
+  // yuz - karanlik
+  [[7,2],[8,2],[9,2],[10,2],[11,2],[12,2],[13,2],[14,2],[15,2],[16,2]].forEach(function(c){p.push([c[0],c[1],"#1a1018"])});
+  [[7,3],[8,3],[9,3],[10,3],[11,3],[12,3],[13,3],[14,3],[15,3],[16,3]].forEach(function(c){p.push([c[0],c[1],"#1a1018"])});
+  // kirmizi gozler
+  p.push([9,2,gozR],[10,2,gozR],[13,2,gozR],[14,2,gozR]);
+  p.push([9,3,"#ff6060"],[14,3,"#ff6060"]); // goz parlamasi
+  // govde - agir zirh
+  for(var y=4;y<=10;y++)for(var x=6;x<=17;x++){
+    var kenar=(x==6||x==17||y==4);
+    p.push([x,y,kenar?zrhR:zrhH]);
+  }
+  // zirh detaylari
+  for(var y=5;y<=9;y++)p.push([11,y,"#444"],[12,y,"#444"]);
+  // omuz zirhi (buyuk)
+  [[4,4],[5,4],[5,5],[4,5],[3,5],[18,4],[19,4],[18,5],[19,5],[20,5]].forEach(function(c){p.push([c[0],c[1],zrhR])});
+  // kollar
+  if(poz==1){// saldiri pozu
+    [[3,6],[3,7],[2,7],[2,8],[1,8]].forEach(function(c){p.push([c[0],c[1],"#1a1018"])});
+    [[20,6],[20,7],[21,7],[21,8],[22,8]].forEach(function(c){p.push([c[0],c[1],"#1a1018"])});
+  } else {
+    [[4,6],[4,7],[4,8],[3,8],[3,9]].forEach(function(c){p.push([c[0],c[1],"#1a1018"])});
+    [[19,6],[19,7],[19,8],[20,8],[20,9]].forEach(function(c){p.push([c[0],c[1],"#1a1018"])});
+  }
+  // kemer - kirmizi
+  for(var x=6;x<=17;x++)p.push([x,11,"#801020"]);
+  p.push([11,11,"#c0a030"],[12,11,"#c0a030"]); // toka
+  // bacaklar
+  for(var y=12;y<=15;y++){
+    for(var x=7;x<=10;x++)p.push([x,y,zrhR]);
+    for(var x=13;x<=16;x++)p.push([x,y,zrhR]);
+  }
+  // botlar
+  for(var y=16;y<=17;y++){
+    for(var x=6;x<=10;x++)p.push([x,y,"#1a1018"]);
+    for(var x=13;x<=17;x++)p.push([x,y,"#1a1018"]);
+  }
+  // pelerin - koyu mor
+  for(var y=5;y<=14;y++){p.push([5,y,"#301030"]);p.push([18,y,"#301030"])}
+  for(var y=8;y<=16;y++){p.push([4,y,"#200820"]);p.push([19,y,"#200820"])}
+  return sp(24,24,p);
+}
+var bossK=[bossCiz(0,0),bossCiz(1,0)];
+// hasarli versiyonlar sonra dinamik uretilecek
+
+// boss kilici - buyuk, kirmizi
+var bossKilicSp=sp(16,5,(function(){var p=[];
+  for(var x=0;x<16;x++){var c=x<3?"#401010":x<5?"#888":"#aaa";p.push([x,1,c],[x,2,c],[x,3,c])}
+  p.push([15,0,"#ddd"],[15,4,"#ddd"],[14,0,"#bbb"],[14,4,"#bbb"]);
+  p.push([0,0,"#301010"],[0,4,"#301010"],[1,0,"#401010"],[1,4,"#401010"]);
+  return p})());
+
+// ===================== KARO =====================
+function karoYap(tip){var p=[],x,y;
+if(tip==1){for(y=0;y<16;y++)for(x=0;x<16;x++){if(y<3){var g=90+(Math.random()*70)|0;p.push([x,y,"rgb("+(35+(Math.random()*20|0))+","+g+","+(18+(Math.random()*18|0))+")"])}else{var t=65+(Math.random()*45)|0;p.push([x,y,"rgb("+(t+18)+","+(t-8)+","+(t-28)+")"])}}}
+else if(tip==2){for(y=0;y<16;y++)for(x=0;x<16;x++){var v=75+(Math.random()*35)|0;var k=(x==0||x==15||y==0||y==15);p.push([x,y,k?"rgb("+(v-18)+","+(v-18)+","+(v-12)+")":"rgb("+v+","+v+","+(v+4)+")"])}}
+else if(tip==3){for(y=0;y<16;y++)for(x=0;x<16;x++){var sN=Math.floor(y/4),of=(sN%2)*4,bx=(x+of)%8,hrc=(y%4==0)||(bx==0);if(hrc)p.push([x,y,"rgb("+(135+(Math.random()*20|0))+","+(125+(Math.random()*18|0))+","+(105+(Math.random()*18|0))+")"]);else{var r=140+(Math.random()*50)|0;p.push([x,y,"rgb("+r+","+(r*0.44|0)+","+(r*0.28|0)+")"])}}}
+return sp(16,16,p)}
+var karoOB={};function karoG(t){if(!karoOB[t])karoOB[t]=karoYap(t);return karoOB[t]}
+
+// ===================== BOLUMLER =====================
+var bolumler=[
+{// bolum 1 - karanlik orman
+  karoTipi:1,
+  harita:(function(){var h=[];for(var i=0;i<60;i++)h.push([i,12]);[15,16,30,31,32].forEach(function(i){h=h.filter(function(k){return k[0]!=i||k[1]!=12})});
+  return h.concat([[6,10],[7,10],[8,10],[12,8],[13,8],[14,8],[20,10],[21,10],[22,10],[25,8],[26,8],[27,8],[34,9],[35,9],[36,9],[37,9],[40,10],[41,10],[42,10],[44,7],[45,7],[46,7],[50,9],[51,9],[52,9],[53,9]])})(),
+  altinlar:[[7,9],[13,7],[21,9],[26,7],[35,8],[45,6],[51,8],[52,8]],
+  dusmanlar:[{x:20,y:9,m:3},{x:40,y:9,m:2},{x:50,y:8,m:4}],
+  yarasalar:[{x:18,y:5,m:3},{x:35,y:4,m:4}],
+  dikenler:[[15,11],[30,11],[31,11]],
+  kalpler:[[44,6]],
+  lavlar:[],
+  hareketliPlatformlar:[{x:17,y:10,w:3,minY:8,maxY:10,hiz:0.02},{x:33,y:9,w:2,minX:28,maxX:36,hiz:0.015}],
+  silahlar:[{x:12,y:7,tip:"kilic"}],
+  bayrak:[55,10],boss:null
+},
+{// bolum 2 - gunesli baslar, firtina ile biter
+  karoTipi:2,
+  harita:(function(){var h=[];for(var i=0;i<65;i++)h.push([i,12]);[10,11,25,26,27,40,41,55,56].forEach(function(i){h=h.filter(function(k){return k[0]!=i||k[1]!=12})});
+  return h.concat([[4,10],[5,10],[6,10],[8,8],[9,8],[13,9],[14,9],[15,9],[17,7],[18,7],[19,7],[22,10],[23,10],[29,9],[30,9],[31,9],[32,9],[34,7],[35,7],[36,7],[38,10],[39,10],[43,8],[44,8],[45,8],[47,10],[48,10],[49,10],[51,7],[52,7],[53,7],[57,9],[58,9],[59,9],[60,9]])})(),
+  altinlar:[[5,9],[8,7],[9,7],[14,8],[18,6],[30,8],[35,6],[44,7],[52,6],[58,8],[59,8]],
+  dusmanlar:[{x:13,y:8,m:3},{x:29,y:8,m:4},{x:47,y:9,m:3},{x:57,y:8,m:4}],
+  yarasalar:[{x:12,y:3,m:4},{x:28,y:3,m:3},{x:44,y:3,m:5},{x:54,y:2,m:3}],
+  dikenler:[[10,11],[25,11],[26,11],[40,11],[55,11]],
+  kalpler:[[17,6],[51,6]],
+  lavlar:[[25,12],[26,12],[27,12],[40,12],[41,12]],
+  hareketliPlatformlar:[{x:10,y:10,w:2,minY:7,maxY:10,hiz:0.018},{x:42,y:9,w:3,minY:6,maxY:9,hiz:0.02},{x:55,y:10,w:2,minX:53,maxX:58,hiz:0.02}],
+  silahlar:[{x:18,y:6,tip:"ok"},{x:43,y:7,tip:"kilic"}],
+  bayrak:[62,10],boss:null
+},
+{// bolum 3 - kaos + BOSS
+  karoTipi:3,
+  harita:(function(){var h=[];for(var i=0;i<80;i++)h.push([i,12]);[8,9,18,19,20,30,31,32,33,45,46,47,58,59,60].forEach(function(i){h=h.filter(function(k){return k[0]!=i||k[1]!=12})});
+  return h.concat([[3,10],[4,10],[5,10],[7,8],[11,9],[12,9],[14,7],[15,7],[16,7],[21,10],[22,10],[24,8],[25,8],[26,8],[28,6],[29,6],[34,9],[35,9],[37,7],[38,7],[39,7],[41,10],[42,10],[43,10],[48,8],[49,8],[50,8],[52,6],[53,6],[54,6],[56,10],[57,10],[61,9],[62,9],[63,9],[64,9],
+  // boss arena zemini
+  [66,12],[67,12],[68,12],[69,12],[70,12],[71,12],[72,12],[73,12],[74,12],[75,12],[76,12],[77,12],[78,12]])})(),
+  altinlar:[[4,9],[14,6],[15,6],[22,9],[25,7],[28,5],[38,6],[49,7],[53,5],[62,8],[63,8]],
+  dusmanlar:[{x:11,y:8,m:2},{x:34,y:8,m:2},{x:41,y:9,m:3},{x:61,y:8,m:4}],
+  yarasalar:[{x:10,y:3,m:4},{x:26,y:2,m:5},{x:40,y:2,m:4},{x:52,y:1,m:5},{x:60,y:3,m:3}],
+  dikenler:[[8,11],[18,11],[19,11],[30,11],[31,11],[45,11],[46,11],[58,11],[59,11]],
+  kalpler:[[28,5],[52,5],[70,11]],
+  lavlar:[[8,12],[9,12],[18,12],[19,12],[20,12],[30,12],[31,12],[32,12],[33,12],[45,12],[46,12],[47,12],[58,12],[59,12],[60,12]],
+  hareketliPlatformlar:[{x:8,y:9,w:2,minY:7,maxY:10,hiz:0.025},{x:20,y:8,w:2,minX:18,maxX:24,hiz:0.02},{x:33,y:8,w:3,minY:5,maxY:9,hiz:0.02},{x:47,y:8,w:2,minY:6,maxY:10,hiz:0.03},{x:58,y:9,w:2,minX:56,maxX:62,hiz:0.025}],
+  silahlar:[{x:14,y:6,tip:"ok"},{x:38,y:6,tip:"kilic"},{x:53,y:5,tip:"ok"},{x:68,y:11,tip:"kilic"}],
+  bayrak:[77,10],
+  boss:{x:72,y:6,can:100} // KARA SOVALYE!
+}
+];
+
+// ===================== OYUN DURUMU =====================
+var mB=0,can=3,tAltin=0,durum="menu",sayac=0,kamX=0,sarsinti=0,parcalar=[];
+var izgara={},altinL,dusmanL,yarasaL,dikenL,kalpL,lavL,hareketliPL,silahL,bayrakP;
+var mevcutSilah="kilic"; // "kilic" veya "ok"
+var oklar=[]; // havadaki oklar
+var boss=null; // aktif boss objesi
+var bossAktif=false;
+var simsekZaman=0; // yildirim zamanlayici
+var havaDurumu=0; // 0=normal, 1=gunesli, 2=bulutlu, 3=firtina
+var yagmurDamlalari=[];
+
+function bolumYukle(){
+  var bl=bolumler[mB];izgara={};
+  for(var i=0;i<bl.harita.length;i++){var k=bl.harita[i];izgara[k[0]+","+k[1]]=bl.karoTipi}
+  altinL=bl.altinlar.map(function(a){return{x:a[0]*BO,y:a[1]*BO,aktif:true}});
+  dusmanL=bl.dusmanlar.map(function(d){return{x:d.x*BO,y:d.y*BO,ox:d.x*BO,m:d.m*BO,yon:1,aktif:true}});
+  yarasaL=(bl.yarasalar||[]).map(function(y){return{x:y.x*BO,y:y.y*BO,ox:y.x*BO,oy:y.y*BO,m:y.m*BO,t:Math.random()*100,aktif:true}});
+  dikenL=bl.dikenler.map(function(d){return{x:d[0]*BO,y:d[1]*BO}});
+  kalpL=(bl.kalpler||[]).map(function(k){return{x:k[0]*BO,y:k[1]*BO,aktif:true}});
+  lavL=(bl.lavlar||[]).map(function(l){return{x:l[0]*BO,y:l[1]*BO}});
+  hareketliPL=(bl.hareketliPlatformlar||[]).map(function(hp){
+    return{x:hp.x*BO,y:hp.y*BO,w:hp.w*BO,h:BO,minY:hp.minY!=undefined?hp.minY*BO:undefined,maxY:hp.maxY!=undefined?hp.maxY*BO:undefined,minX:hp.minX!=undefined?hp.minX*BO:undefined,maxX:hp.maxX!=undefined?hp.maxX*BO:undefined,hiz:hp.hiz,t:Math.random()*100,oncekiX:hp.x*BO,oncekiY:hp.y*BO}
+  });
+  silahL=(bl.silahlar||[]).map(function(s){return{x:s.x*BO,y:s.y*BO,tip:s.tip,aktif:true}});
+  bayrakP={x:bl.bayrak[0]*BO,y:bl.bayrak[1]*BO};
+  oklar=[];
+  // boss
+  if(bl.boss){
+    boss={x:bl.boss.x*BO,y:bl.boss.y*BO,can:bl.boss.can,maxCan:bl.boss.can,w:56,h:54,
+      vx:0,vy:0,yerde:false,durum:"bekle",saldiriSayac:0,bakan:-1,
+      saldiTip:0,dashHiz:0,hasar:0,oldu:false,olumZaman:0,
+      atesToplar:[]}; // boss ates topu atiyor
+    bossAktif=false; // oyuncu yaklasinca aktif olacak
+  } else {boss=null;bossAktif=false}
+  // hava durumu
+  yagmurDamlalari=[];
+  havaDurumu = mB==0?0 : mB==1?1 : 3;
+}
+
+// ===================== OYUNCU =====================
+var o={x:64,y:200,vx:0,vy:0,w:32,h:38,yerde:false,bakan:1,saldiriyor:false,saldiriSayac:0,dokunulmaz:0,animSayac:0,kojotZ:0,tamponZ:0,zipTut:false,zipKesme:0,squash:0};
+function oSifirla(){o.x=64;o.y=200;o.vx=0;o.vy=0;o.yerde=false;o.saldiriyor=false;o.saldiriSayac=0;o.dokunulmaz=60;o.kojotZ=0;o.tamponZ=0;o.zipTut=false;o.squash=0}
+
+// ===================== GIRDI =====================
+var tus={};
+document.addEventListener("keydown",function(e){
+  tus[e.key]=true;
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].indexOf(e.key)>-1)e.preventDefault();
+  if((e.key==" "||e.key=="x"||e.key=="X")&&durum=="oyna"){
+    o.saldiriyor=true;o.saldiriSayac=14;
+    sfxCal("kilic");
+    // ok atisi
+    if(mevcutSilah=="ok"){
+      oklar.push({x:o.x+o.w/2,y:o.y+12,vx:o.bakan*7,vy:0,omur:80});
+    }
+  }
+  if(e.key=="q"||e.key=="Q"){mevcutSilah=mevcutSilah=="kilic"?"ok":"kilic";arayuzGunc()}
+  if(e.key=="Enter"){
+    if(durum=="menu")basla();
+    else if(durum=="oldu"||durum=="bitti"){mB=0;can=3;tAltin=0;mevcutSilah="kilic";basla()}
+    else if(durum=="gecti"){mB++;basla()}
+  }
+});
+document.addEventListener("keyup",function(e){tus[e.key]=false});
+function mobilBagla(id,k){var el=document.getElementById(id);
+  el.addEventListener("touchstart",function(e){e.preventDefault();tus[k]=true;if(k==" "){o.saldiriyor=true;o.saldiriSayac=14;sfxCal("kilic");if(mevcutSilah=="ok")oklar.push({x:o.x+o.w/2,y:o.y+12,vx:o.bakan*7,vy:0,omur:80})}},{passive:false});
+  el.addEventListener("touchend",function(e){e.preventDefault();tus[k]=false},{passive:false})}
+mobilBagla("btn-sol","ArrowLeft");mobilBagla("btn-sag","ArrowRight");mobilBagla("btn-zipla","ArrowUp");mobilBagla("btn-saldiri"," ");
+
+// ===================== FIZIK =====================
+function saglam(px,py){var tx=Math.floor(px/BO),ty=Math.floor(py/BO);return(izgara[tx+","+ty]||0)!=0}
+function hpUstunde(px,py,pvx){
+  // hareketli platform uzerinde mi kontrol
+  for(var i=0;i<hareketliPL.length;i++){
+    var hp=hareketliPL[i];
+    if(px>=hp.x&&px<=hp.x+hp.w&&py>=hp.y-2&&py<=hp.y+4)return hp;
+  }return null;
+}
+function dikCarpis(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
+function parcOlustur(x,y,r,n){for(var i=0;i<n;i++)parcalar.push({x:x,y:y,vx:(Math.random()-0.5)*4.5,vy:-Math.random()*4.5-1,omur:18+(Math.random()*22)|0,renk:r,boyut:2+(Math.random()*3)|0})}
+
+// ===================== GUNCELLEME =====================
+function guncelle(){
+  sayac++;if(sarsinti>0)sarsinti--;
+  // parcaciklar
+  var yP=[];for(var i=0;i<parcalar.length;i++){var pr=parcalar[i];pr.x+=pr.vx;pr.y+=pr.vy;pr.vy+=0.16;pr.omur--;if(pr.omur>0)yP.push(pr)}parcalar=yP;
+
+  if(durum!="oyna")return;
+
+  // hava durumu guncelle
+  if(mB==1){
+    // bolum 2: baslangicta gunesli, ilerledikce firtina
+    var ilerleme=kamX/(62*BO); // 0-1 arasi
+    if(ilerleme<0.4)havaDurumu=1;
+    else if(ilerleme<0.65)havaDurumu=2;
+    else havaDurumu=3;
+  }
+  // yagmur
+  if(havaDurumu>=2){
+    var damlaSayisi=havaDurumu==3?8:3;
+    for(var i=0;i<damlaSayisi;i++){
+      yagmurDamlalari.push({x:kamX+Math.random()*GEN,y:-10,vy:6+Math.random()*4,omur:60+Math.random()*40|0});
+    }
+  }
+  yagmurDamlalari=yagmurDamlalari.filter(function(d){d.y+=d.vy;d.x-=1;d.omur--;return d.omur>0&&d.y<YUK});
+  // simsek
+  if(havaDurumu==3&&Math.random()<0.005)simsekZaman=8;
+  if(simsekZaman>0)simsekZaman--;
+
+  o.animSayac++;
+  if(o.dokunulmaz>0)o.dokunulmaz--;
+  if(o.saldiriSayac>0){o.saldiriSayac--;if(o.saldiriSayac<=0)o.saldiriyor=false}
+
+  // hareketli platformlar
+  for(var i=0;i<hareketliPL.length;i++){
+    var hp=hareketliPL[i];
+    hp.oncekiX=hp.x;hp.oncekiY=hp.y;
+    hp.t+=hp.hiz;
+    if(hp.minY!=undefined){hp.y=hp.minY+(hp.maxY-hp.minY)*(Math.sin(hp.t)*0.5+0.5)}
+    if(hp.minX!=undefined){hp.x=hp.minX+(hp.maxX-hp.minX)*(Math.sin(hp.t)*0.5+0.5)}
+  }
+
+  var zipTus=tus["ArrowUp"]||tus["w"]||tus["W"];
+  if(o.yerde)o.kojotZ=7;else if(o.kojotZ>0)o.kojotZ--;
+  if(zipTus&&!o.yerde&&o.kojotZ<=0)o.tamponZ=8;
+  if(o.tamponZ>0)o.tamponZ--;
+
+  var hiz=3.2;
+  if(tus["ArrowLeft"]||tus["a"]||tus["A"]){if(o.yerde)o.vx=-hiz;else o.vx+=(-hiz-o.vx)*0.12;o.bakan=-1}
+  else if(tus["ArrowRight"]||tus["d"]||tus["D"]){if(o.yerde)o.vx=hiz;else o.vx+=(hiz-o.vx)*0.12;o.bakan=1}
+  else{if(o.yerde)o.vx*=0.7;else o.vx*=0.97}
+
+  var ziplayabilir=o.yerde||o.kojotZ>0;
+  if(zipTus&&ziplayabilir){o.vy=-9;o.yerde=false;o.kojotZ=0;o.tamponZ=0;o.zipTut=true;o.zipKesme=0;sfxCal("zipla")}
+  else if(o.yerde&&o.tamponZ>0){o.vy=-9;o.yerde=false;o.tamponZ=0;o.zipTut=true;o.zipKesme=0;sfxCal("zipla")}
+
+  if(o.zipTut&&o.vy<0){o.zipKesme++;if(!zipTus){o.vy*=0.55;o.zipTut=false}if(o.zipKesme>18)o.zipTut=false}
+  if(o.vy<0)o.vy+=0.42;else o.vy+=0.62;
+  if(Math.abs(o.vy)<1.5)o.vy+=0.15;
+  if(o.vy>11)o.vy=11;
+
+  var inisH=o.vy;
+  o.x+=o.vx;var ic=6;
+  if(o.vx<0){if(saglam(o.x+ic,o.y+2)||saglam(o.x+ic,o.y+o.h-2)){o.x=Math.floor((o.x+ic)/BO)*BO+BO-ic;o.vx=0}}
+  else if(o.vx>0){if(saglam(o.x+o.w-ic,o.y+2)||saglam(o.x+o.w-ic,o.y+o.h-2)){o.x=Math.floor((o.x+o.w-ic)/BO)*BO-o.w+ic;o.vx=0}}
+
+  o.y+=o.vy;var oncekiY=o.yerde;o.yerde=false;
+  if(o.vy>0){
+    if(saglam(o.x+ic+2,o.y+o.h)||saglam(o.x+o.w-ic-2,o.y+o.h)){
+      o.y=Math.floor((o.y+o.h)/BO)*BO-o.h;o.vy=0;o.yerde=true;
+      if(!oncekiY&&inisH>3){o.squash=Math.min(inisH*0.7,6);for(var ti=0;ti<(inisH*1.2|0);ti++)parcalar.push({x:o.x+o.w/2+(Math.random()-0.5)*o.w,y:o.y+o.h,vx:(Math.random()-0.5)*inisH*0.6,vy:-Math.random()*1.5-0.3,omur:10+(Math.random()*10)|0,renk:"#a09070",boyut:1+(Math.random()*2)|0})}
+    }
+    // hareketli platform kontrolu
+    if(!o.yerde){
+      for(var i=0;i<hareketliPL.length;i++){
+        var hp=hareketliPL[i];
+        if(o.x+o.w-ic>hp.x&&o.x+ic<hp.x+hp.w&&o.y+o.h>=hp.y&&o.y+o.h<=hp.y+8&&o.vy>=0){
+          o.y=hp.y-o.h;o.vy=0;o.yerde=true;
+          // platform hareketiyle tasima
+          o.x+=(hp.x-hp.oncekiX);o.y+=(hp.y-hp.oncekiY);
+          break;
+        }
+      }
+    }
+  }
+  else if(o.vy<0){if(saglam(o.x+ic+2,o.y)||saglam(o.x+o.w-ic-2,o.y)){o.y=Math.floor(o.y/BO)*BO+BO;o.vy=0}}
+  if(o.squash>0){o.squash*=0.75;if(o.squash<0.3)o.squash=0}
+
+  if(o.y>YUK+60){vur();if(durum=="oyna")oSifirla();return}
+  var hedefK=o.x-GEN/3;kamX+=(hedefK-kamX)*0.1;if(kamX<0)kamX=0;
+
+  // kilic alani
+  var kA=null;
+  if(o.saldiriyor&&mevcutSilah=="kilic")kA={x:o.bakan>0?o.x+o.w:o.x-30,y:o.y+4,w:30,h:20};
+
+  // oklar guncelle
+  for(var i=oklar.length-1;i>=0;i--){
+    var ok=oklar[i];ok.x+=ok.vx;ok.vy+=0.05;ok.y+=ok.vy;ok.omur--;
+    if(ok.omur<=0||saglam(ok.x,ok.y)){oklar.splice(i,1);continue}
+    // ok dusmana carpti mi
+    for(var j=0;j<dusmanL.length;j++){var d=dusmanL[j];if(!d.aktif)continue;if(dikCarpis({x:ok.x-2,y:ok.y-2,w:12,h:6},{x:d.x+4,y:d.y+4,w:24,h:28})){d.aktif=false;oklar.splice(i,1);parcOlustur(d.x+12,d.y+12,"#38a838",12);sarsinti=4;break}}
+    // ok yarasaya carpti mi
+    for(var j=0;j<yarasaL.length;j++){var yr=yarasaL[j];if(!yr.aktif)continue;if(dikCarpis({x:ok.x-2,y:ok.y-2,w:12,h:6},{x:yr.x+2,y:yr.y+2,w:28,h:16})){yr.aktif=false;oklar.splice(i,1);parcOlustur(yr.x+14,yr.y+8,"#6850a0",10);sarsinti=4;break}}
+    // ok bossa carpti mi
+    if(boss&&bossAktif&&!boss.oldu){
+      if(dikCarpis({x:ok.x-2,y:ok.y-2,w:12,h:6},{x:boss.x,y:boss.y,w:boss.w,h:boss.h})){
+        boss.can-=8;boss.hasar+=8;oklar.splice(i,1);parcOlustur(boss.x+boss.w/2,boss.y+boss.h/2,"#ff4040",8);sarsinti=4;sfxCal("vurus");
+        if(boss.can<=0){boss.oldu=true;boss.olumZaman=120;sfxCal("olum")}
+      }
+    }
+  }
+
+  // altinlar
+  for(var i=0;i<altinL.length;i++){var a=altinL[i];if(!a.aktif)continue;if(dikCarpis(o,{x:a.x+4,y:a.y+4,w:24,h:24})){a.aktif=false;tAltin++;parcOlustur(a.x+12,a.y+12,"#e8b830",8);sfxCal("altin")}}
+  // kalpler
+  for(var i=0;i<kalpL.length;i++){var k=kalpL[i];if(!k.aktif)continue;if(dikCarpis(o,{x:k.x+4,y:k.y+4,w:24,h:20})){k.aktif=false;if(can<5)can++;parcOlustur(k.x+12,k.y+10,"#d03848",10)}}
+  // silah pickuplari
+  for(var i=0;i<silahL.length;i++){var s=silahL[i];if(!s.aktif)continue;if(dikCarpis(o,{x:s.x+4,y:s.y+4,w:24,h:24})){s.aktif=false;mevcutSilah=s.tip;parcOlustur(s.x+12,s.y+12,"#70b0e0",10);sfxCal("altin")}}
+
+  // dusmanlar
+  for(var i=0;i<dusmanL.length;i++){var d=dusmanL[i];if(!d.aktif)continue;d.x+=d.yon;if(d.x>d.ox+d.m||d.x<d.ox-d.m)d.yon*=-1;var dK={x:d.x+4,y:d.y+4,w:24,h:28};if(kA&&dikCarpis(kA,dK)){d.aktif=false;parcOlustur(d.x+12,d.y+12,"#38a838",12);sarsinti=6;continue}if(o.vy>0&&dikCarpis(o,dK)&&o.y+o.h-8<d.y+8){d.aktif=false;o.vy=-7;parcOlustur(d.x+12,d.y+12,"#38a838",12);continue}if(dikCarpis(o,dK)&&o.dokunulmaz<=0)vur()}
+  // yarasalar
+  for(var i=0;i<yarasaL.length;i++){var yr=yarasaL[i];if(!yr.aktif)continue;yr.t+=0.04;yr.x=yr.ox+Math.sin(yr.t)*yr.m;yr.y=yr.oy+Math.cos(yr.t*1.3)*30;var yrK={x:yr.x+2,y:yr.y+2,w:28,h:16};if(kA&&dikCarpis(kA,yrK)){yr.aktif=false;parcOlustur(yr.x+14,yr.y+8,"#6850a0",10);sarsinti=6;continue}if(dikCarpis(o,yrK)&&o.dokunulmaz<=0)vur()}
+  // dikenler
+  for(var i=0;i<dikenL.length;i++){var dk=dikenL[i];if(dikCarpis(o,{x:dk.x+4,y:dk.y+8,w:24,h:20})&&o.dokunulmaz<=0){vur();if(durum=="oyna")o.vy=-6}}
+  // lavlar
+  for(var i=0;i<lavL.length;i++){var lv=lavL[i];if(dikCarpis(o,{x:lv.x+2,y:lv.y+8,w:BO-4,h:BO-8})&&o.dokunulmaz<=0){vur();if(durum=="oyna")o.vy=-8}}
+
+  // ======== BOSS AI ========
+  if(boss&&!boss.oldu){
+    // oyuncu yaklasinca aktif ol
+    if(!bossAktif&&o.x>boss.x-GEN*0.6)bossAktif=true;
+    if(bossAktif){
+      // yercekimi
+      boss.vy+=0.5;if(boss.vy>10)boss.vy=10;
+      boss.y+=boss.vy;
+      // zemin kontrolu
+      var bBot=boss.y+boss.h;
+      var bTx1=Math.floor((boss.x+8)/BO),bTx2=Math.floor((boss.x+boss.w-8)/BO),bTy=Math.floor(bBot/BO);
+      if((izgara[bTx1+","+bTy]||0)!=0||(izgara[bTx2+","+bTy]||0)!=0){
+        boss.y=bTy*BO-boss.h;boss.vy=0;boss.yerde=true;
+      }else boss.yerde=false;
+
+      // oyuncuya bak
+      boss.bakan=o.x<boss.x?-1:1;
+
+      // saldiri zamanlayici
+      boss.saldiriSayac++;
+      var mesafe=Math.abs(o.x-boss.x);
+
+      if(boss.durum=="bekle"){
+        // yurume - oyuncuya dogru
+        if(mesafe>80){boss.x+=boss.bakan*1.2}
+        // saldiri secimi
+        if(boss.saldiriSayac>90){
+          boss.saldiriSayac=0;
+          var r=Math.random();
+          if(mesafe<100){boss.durum="kilic";boss.saldiTip=0}
+          else if(r<0.4){boss.durum="dash";boss.dashHiz=boss.bakan*6}
+          else{boss.durum="ates";boss.saldiTip=0}
+        }
+      }
+      else if(boss.durum=="kilic"){
+        boss.saldiTip++;
+        if(boss.saldiTip>20){boss.durum="bekle";boss.saldiriSayac=30}
+        // kilic vurusu - oyuncuya hasar
+        if(boss.saldiTip==10){
+          var bKilic={x:boss.bakan>0?boss.x+boss.w:boss.x-40,y:boss.y+10,w:40,h:30};
+          if(dikCarpis(o,bKilic)&&o.dokunulmaz<=0){vur();o.vx=boss.bakan*5;o.vy=-4}
+          sarsinti=4;sfxCal("kilic");
+        }
+      }
+      else if(boss.durum=="dash"){
+        boss.x+=boss.dashHiz;
+        boss.saldiTip++;
+        // duvara carparsa veya yeterince gittiyse dur
+        if(boss.saldiTip>30||saglam(boss.x+(boss.dashHiz>0?boss.w:0),boss.y+boss.h/2)){
+          boss.durum="bekle";boss.saldiriSayac=40;boss.saldiTip=0;
+          sarsinti=6;
+        }
+        // dash sirasinda carpisma
+        if(dikCarpis(o,{x:boss.x,y:boss.y,w:boss.w,h:boss.h})&&o.dokunulmaz<=0){vur();o.vx=boss.bakan*6;o.vy=-5}
+      }
+      else if(boss.durum=="ates"){
+        boss.saldiTip++;
+        if(boss.saldiTip==15){
+          // ates topu firlat
+          boss.atesToplar.push({x:boss.x+boss.w/2,y:boss.y+20,vx:boss.bakan*4,vy:-2,omur:120});
+          sfxCal("vurus");
+        }
+        if(boss.saldiTip==35&&boss.can<50){
+          // dusuk canda ikinci ates topu
+          boss.atesToplar.push({x:boss.x+boss.w/2,y:boss.y+20,vx:boss.bakan*3.5,vy:-3,omur:120});
+        }
+        if(boss.saldiTip>45){boss.durum="bekle";boss.saldiriSayac=20;boss.saldiTip=0}
+      }
+
+      // ates toplari guncelle
+      for(var i=boss.atesToplar.length-1;i>=0;i--){
+        var at=boss.atesToplar[i];at.x+=at.vx;at.vy+=0.08;at.y+=at.vy;at.omur--;
+        if(at.omur<=0||at.y>YUK){boss.atesToplar.splice(i,1);continue}
+        if(dikCarpis(o,{x:at.x-8,y:at.y-8,w:16,h:16})&&o.dokunulmaz<=0){
+          vur();boss.atesToplar.splice(i,1);o.vy=-4;
+        }
+      }
+
+      // oyuncunun kilici bossa degdi mi
+      if(kA&&dikCarpis(kA,{x:boss.x,y:boss.y,w:boss.w,h:boss.h})){
+        boss.can-=5;boss.hasar+=5;sarsinti=6;parcOlustur(boss.x+boss.w/2,boss.y+boss.h/2,"#ff4040",10);sfxCal("vurus");
+        if(boss.can<=0){boss.oldu=true;boss.olumZaman=120;sfxCal("olum")}
+      }
+      // stomping
+      if(o.vy>0&&dikCarpis(o,{x:boss.x,y:boss.y,w:boss.w,h:boss.h})&&o.y+o.h-10<boss.y+10){
+        boss.can-=10;boss.hasar+=10;o.vy=-8;sarsinti=5;parcOlustur(boss.x+boss.w/2,boss.y,"#ff4040",10);
+        if(boss.can<=0){boss.oldu=true;boss.olumZaman=120;sfxCal("olum")}
+      }
+      // arena siniri
+      if(boss.x<66*BO)boss.x=66*BO;
+      if(boss.x>77*BO)boss.x=77*BO;
+    }
+  }
+  // boss olum animasyonu
+  if(boss&&boss.oldu){
+    boss.olumZaman--;
+    if(boss.olumZaman>0){
+      // patlama parcaciklari
+      if(sayac%4==0)parcOlustur(boss.x+Math.random()*boss.w,boss.y+Math.random()*boss.h,"#ff"+["4040","6060","8020","a000"][Math.random()*4|0],5);
+      sarsinti=3;
+    }
+  }
+
+  // bayrak
+  var bayrakEngel = boss && !boss.oldu;
+  if(!bayrakEngel && dikCarpis(o,{x:bayrakP.x,y:bayrakP.y-20,w:32,h:52})){
+    if(mB<bolumler.length-1){durum="gecti";parcOlustur(bayrakP.x+16,bayrakP.y,"#e8b830",30);sfxCal("gecis")}
+    else{durum="bitti";parcOlustur(bayrakP.x+16,bayrakP.y,"#e8b830",50);sfxCal("gecis")}
+  }
+  arayuzGunc();
+}
+
+function vur(){if(o.dokunulmaz>0)return;can--;sarsinti=10;parcOlustur(o.x+16,o.y+18,"#d03848",15);if(can<=0){durum="oldu";sfxCal("olum")}else{o.dokunulmaz=90;sfxCal("vurus")}arayuzGunc()}
+function arayuzGunc(){
+  var s="";for(var i=0;i<Math.max(0,can);i++)s+="♥";
+  document.getElementById("canUI").textContent=s;
+  document.getElementById("altinUI").textContent=tAltin+" gold";
+  document.getElementById("silahUI").textContent=(mevcutSilah=="kilic"?"⚔ sword":"🏹 bow")+" [Q]";
+  document.getElementById("bolumUI").textContent="stage "+(mB+1);
+}
+
+// ===================== CIZIM =====================
+function ciz(){
+  var bl=bolumler[mB];
+  var sx=sarsinti>0?(Math.random()-0.5)*sarsinti:0,sy=sarsinti>0?(Math.random()-0.5)*sarsinti:0;
+  ctx.save();ctx.translate(sx,sy);
+
+  // gokyuzu - hava durumuna gore
+  var grad=ctx.createLinearGradient(0,0,0,YUK);
+  if(havaDurumu==1){grad.addColorStop(0,"#3080d0");grad.addColorStop(0.5,"#60a8e8");grad.addColorStop(1,"#90d0f0")}
+  else if(havaDurumu==2){grad.addColorStop(0,"#405060");grad.addColorStop(0.5,"#607080");grad.addColorStop(1,"#809098")}
+  else if(havaDurumu==3){grad.addColorStop(0,"#181020");grad.addColorStop(0.3,"#282030");grad.addColorStop(0.6,"#383040");grad.addColorStop(1,"#484050")}
+  else{grad.addColorStop(0,"#1a1040");grad.addColorStop(0.3,"#2a2058");grad.addColorStop(0.6,"#483878");grad.addColorStop(1,"#7090c0")}
+  ctx.fillStyle=grad;ctx.fillRect(0,0,GEN,YUK);
+
+  // simsek flash
+  if(simsekZaman>5){ctx.fillStyle="rgba(255,255,240,0.3)";ctx.fillRect(0,0,GEN,YUK)}
+
+  // gunes (bolum 2 basi)
+  if(havaDurumu==1){
+    ctx.fillStyle="rgba(255,240,100,0.15)";ctx.beginPath();ctx.arc(500-kamX*0.03,60,50,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="rgba(255,220,80,0.3)";ctx.beginPath();ctx.arc(500-kamX*0.03,60,30,0,Math.PI*2);ctx.fill();
+  }
+
+  // yildizlar
+  if(havaDurumu!=1){
+    for(var i=0;i<50;i++){var px=((i*97+33)%800-kamX*0.1)%(GEN+100),py=(i*53+17)%(YUK*0.6);var prk=0.12+(i%3)*0.1;if(i%7==0)prk*=(Math.sin(sayac*0.1+i)*0.5+0.5);ctx.fillStyle="rgba(255,255,255,"+prk+")";if(px<0)px+=GEN+100;ctx.fillRect(px,py,2,2)}
+  }
+
+  // daglar
+  ctx.fillStyle=havaDurumu==1?"rgba(100,160,80,0.2)":havaDurumu>=2?"rgba(40,40,50,0.3)":"rgba(72,56,120,0.2)";
+  for(var i=0;i<8;i++){var mx=i*160-(kamX*0.15)%160;ctx.beginPath();ctx.moveTo(mx,YUK*0.7);ctx.lineTo(mx+80,YUK*0.3+Math.sin(i)*40);ctx.lineTo(mx+160,YUK*0.7);ctx.fill()}
+
+  ctx.save();ctx.translate(-kamX,0);
+
+  // karolar
+  var basSut=Math.floor(kamX/BO)-1,bitSut=basSut+Math.ceil(GEN/BO)+3;
+  for(var key in izgara){var p=key.split(","),tx=parseInt(p[0]),ty=parseInt(p[1]);if(tx<basSut||tx>bitSut)continue;ctx.drawImage(karoG(izgara[key]),tx*BO,ty*BO,BO,BO)}
+
+  // hareketli platformlar
+  for(var i=0;i<hareketliPL.length;i++){
+    var hp=hareketliPL[i];
+    // platform gorunumu
+    ctx.fillStyle="#5a7a50";ctx.fillRect(hp.x,hp.y,hp.w,hp.h);
+    ctx.fillStyle="#6a9a60";ctx.fillRect(hp.x+2,hp.y+2,hp.w-4,4);
+    ctx.fillStyle="#4a6a40";ctx.fillRect(hp.x,hp.y+hp.h-3,hp.w,3);
+    // ok isareti
+    if(hp.minY!=undefined){ctx.fillStyle="rgba(255,255,255,0.15)";ctx.fillRect(hp.x+hp.w/2-1,hp.y-4,2,4);ctx.fillRect(hp.x+hp.w/2-1,hp.y+hp.h,2,4)}
+  }
+
+  // lavlar - animasyonlu
+  for(var i=0;i<lavL.length;i++){
+    var lv=lavL[i];
+    // lav tabani
+    ctx.fillStyle="#d02000";ctx.fillRect(lv.x,lv.y+4,BO,BO-4);
+    // lav yuzey dalgasi
+    for(var lx=0;lx<BO;lx+=2){
+      var ly=Math.sin(sayac*0.08+lx*0.3+lv.x*0.01)*3;
+      ctx.fillStyle=sayac%8<4?"#ff6020":"#ff8040";
+      ctx.fillRect(lv.x+lx,lv.y+2+ly,2,4);
+    }
+    // parlama
+    ctx.fillStyle="rgba(255,100,0,0.08)";ctx.fillRect(lv.x-4,lv.y-20,BO+8,20);
+    // parcacik
+    if(Math.random()<0.05)parcalar.push({x:lv.x+Math.random()*BO,y:lv.y,vx:(Math.random()-0.5)*1,vy:-Math.random()*2-1,omur:15,renk:"#ff"+["4020","6030","8040"][Math.random()*3|0],boyut:2});
+  }
+
+  // dikenler
+  for(var i=0;i<dikenL.length;i++){var dk=dikenL[i];ctx.drawImage(dikenSp,dk.x,dk.y,BO,BO)}
+  // altinlar
+  var af=Math.floor(sayac/10)%4;for(var i=0;i<altinL.length;i++){var a=altinL[i];if(!a.aktif)continue;var bob=Math.sin(sayac*0.08+a.x*0.01)*3;ctx.drawImage(altinK[af],a.x+4,a.y+4+bob,24,24)}
+  // kalpler
+  for(var i=0;i<kalpL.length;i++){var k=kalpL[i];if(!k.aktif)continue;var bob=Math.sin(sayac*0.06+k.x*0.02)*4;ctx.drawImage(kalpSp,k.x+6,k.y+6+bob,20,18)}
+  // silah pickuplari
+  for(var i=0;i<silahL.length;i++){var s=silahL[i];if(!s.aktif)continue;var bob=Math.sin(sayac*0.07+s.x*0.015)*4;
+    ctx.drawImage(s.tip=="kilic"?kilicPickupSp:okPickupSp,s.x+6,s.y+4+bob,20,24);
+    // parlama
+    ctx.fillStyle="rgba(100,180,255,"+(0.1+Math.sin(sayac*0.1)*0.08)+")";ctx.fillRect(s.x+2,s.y+bob,28,28);
+  }
+  // balciklar
+  for(var i=0;i<dusmanL.length;i++){var d=dusmanL[i];if(!d.aktif)continue;var kare=Math.floor(sayac/15)%2;ctx.save();if(d.yon<0){ctx.translate(d.x+32,0);ctx.scale(-1,1);ctx.drawImage(balcikK[kare],0,d.y,32,32)}else ctx.drawImage(balcikK[kare],d.x,d.y,32,32);ctx.restore()}
+  // yarasalar
+  for(var i=0;i<yarasaL.length;i++){var yr=yarasaL[i];if(!yr.aktif)continue;var kare=Math.floor(sayac/8)%2;ctx.drawImage(yarasaK[kare],yr.x,yr.y,32,18)}
+
+  // ======== BOSS CIZIMI ========
+  if(boss){
+    if(!boss.oldu||(boss.oldu&&boss.olumZaman>0)){
+      var bPoz=(boss.durum=="kilic"&&boss.saldiTip>5&&boss.saldiTip<18)?1:0;
+      // dinamik sprite (hasar gosterir)
+      var bSprite=bossCiz(bPoz,boss.hasar);
+      ctx.save();
+      var bx=boss.x,by=boss.y;
+      if(boss.oldu){// olum titremesi
+        bx+=Math.random()*6-3;by+=Math.random()*6-3;
+        ctx.globalAlpha=boss.olumZaman/120;
+      }
+      if(boss.bakan<0){ctx.translate(bx+boss.w,0);ctx.scale(-1,1);ctx.drawImage(bSprite,0,by,boss.w,boss.h)}
+      else ctx.drawImage(bSprite,bx,by,boss.w,boss.h);
+      ctx.restore();
+      ctx.globalAlpha=1;
+
+      // boss kilici
+      if(!boss.oldu&&boss.durum=="kilic"&&boss.saldiTip>5&&boss.saldiTip<18){
+        var bkx=boss.bakan>0?boss.x+boss.w:boss.x-38;
+        ctx.save();
+        if(boss.bakan<0){ctx.translate(bkx+38,0);ctx.scale(-1,1);ctx.drawImage(bossKilicSp,0,boss.y+20,38,12)}
+        else ctx.drawImage(bossKilicSp,bkx,boss.y+20,38,12);
+        ctx.restore();
+      }
+
+      // boss ates toplari
+      for(var i=0;i<boss.atesToplar.length;i++){
+        var at=boss.atesToplar[i];
+        ctx.fillStyle="#ff4020";ctx.beginPath();ctx.arc(at.x,at.y,8,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle="#ff8040";ctx.beginPath();ctx.arc(at.x,at.y,5,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle="#ffcc60";ctx.beginPath();ctx.arc(at.x,at.y,2,0,Math.PI*2);ctx.fill();
+        // ates parcaciklari
+        parcalar.push({x:at.x+(Math.random()-0.5)*6,y:at.y+(Math.random()-0.5)*6,vx:(Math.random()-0.5)*2,vy:-Math.random()*1,omur:6,renk:"#ff6020",boyut:2});
+      }
+
+      // boss can barı
+      if(bossAktif&&!boss.oldu){
+        var barW=100,barH=6,barX=boss.x+boss.w/2-barW/2,barY=boss.y-14;
+        ctx.fillStyle="rgba(0,0,0,0.5)";ctx.fillRect(barX-1,barY-1,barW+2,barH+2);
+        ctx.fillStyle="#400";ctx.fillRect(barX,barY,barW,barH);
+        var canOran=boss.can/boss.maxCan;
+        ctx.fillStyle=canOran>0.5?"#d04040":canOran>0.25?"#d08020":"#ff2020";
+        ctx.fillRect(barX,barY,barW*canOran,barH);
+        // isim
+        ctx.fillStyle="#fff";ctx.font="8px monospace";ctx.textAlign="center";
+        ctx.fillText("DARK KNIGHT",boss.x+boss.w/2,barY-3);
+        ctx.textAlign="left";
+      }
+    }
+  }
+
+  // bayrak
+  ctx.drawImage(bayrakCiz(sayac),bayrakP.x,bayrakP.y-4,36,40);
+  // boss varsa ve olmediyse bayrak soluk
+  if(boss&&!boss.oldu){ctx.fillStyle="rgba(0,0,0,0.4)";ctx.fillRect(bayrakP.x-2,bayrakP.y-8,40,48)}
+
+  // oklar
+  for(var i=0;i<oklar.length;i++){var ok=oklar[i];ctx.save();ctx.translate(ok.x,ok.y);var aci=Math.atan2(ok.vy,ok.vx);ctx.rotate(aci);ctx.drawImage(okSp,-5,-1,10,3);ctx.restore()}
+
+  // -- OYUNCU --
+  if(durum=="oyna"||durum=="gecti"||durum=="bitti"){
+    if(o.dokunulmaz>0&&sayac%4<2){}
+    else{
+      var poz;if(o.saldiriyor)poz=3;else if(!o.yerde)poz=2;else if(Math.abs(o.vx)>1)poz=(Math.floor(sayac/8)%2==0)?0:1;else poz=0;
+      var cW=40,cH=40,skX=1,skY=1,sq=o.squash||0;
+      if(sq>0){skX=1+sq*0.04;skY=1-sq*0.04}else if(o.vy<-3){var st=Math.min(Math.abs(o.vy)*0.015,0.12);skX=1-st;skY=1+st}else if(o.vy>4&&!o.yerde){var st=Math.min(o.vy*0.01,0.08);skX=1-st*0.5;skY=1+st}
+      var mX=o.x+(o.w-cW*skX)/2+cW*skX/2,mY=o.y+o.h;
+      ctx.save();ctx.translate(mX,mY);ctx.scale(o.bakan<0?-skX:skX,skY);ctx.translate(-cW/2,-cH);ctx.drawImage(sovalyeK[poz],0,0,cW,cH);ctx.restore();
+      // silah
+      if(o.saldiriyor){
+        if(mevcutSilah=="kilic"){var kx=o.bakan>0?o.x+o.w-4:o.x-30;ctx.save();if(o.bakan<0){ctx.translate(kx+34,0);ctx.scale(-1,1);ctx.drawImage(kilicSp,0,o.y+10,34,12)}else ctx.drawImage(kilicSp,kx,o.y+10,34,12);ctx.restore()}
+        else{// ok atisi efekti
+          var kx=o.bakan>0?o.x+o.w-2:o.x-12;ctx.save();if(o.bakan<0){ctx.translate(kx+14,0);ctx.scale(-1,1);ctx.drawImage(okSp,0,o.y+12,14,4)}else ctx.drawImage(okSp,kx,o.y+12,14,4);ctx.restore()}
+      }
+    }
+  }
+
+  // parcaciklar
+  for(var i=0;i<parcalar.length;i++){var pr=parcalar[i];ctx.globalAlpha=pr.omur/28;ctx.fillStyle=pr.renk;ctx.fillRect(pr.x,pr.y,pr.boyut,pr.boyut)}ctx.globalAlpha=1;
+
+  ctx.restore(); // kamera
+
+  // yagmur
+  if(havaDurumu>=2){
+    ctx.strokeStyle=havaDurumu==3?"rgba(180,190,220,0.3)":"rgba(150,160,180,0.2)";
+    ctx.lineWidth=1;
+    for(var i=0;i<yagmurDamlalari.length;i++){
+      var d=yagmurDamlalari[i];
+      ctx.beginPath();ctx.moveTo(d.x-kamX,d.y);ctx.lineTo(d.x-kamX-2,d.y+d.vy*2);ctx.stroke();
+    }
+  }
+
+  // simsek cizgisi
+  if(simsekZaman>3&&simsekZaman<7){
+    ctx.strokeStyle="rgba(255,255,240,0.8)";ctx.lineWidth=2;
+    ctx.beginPath();var lx=200+Math.random()*200;ctx.moveTo(lx,0);
+    for(var i=0;i<6;i++){lx+=(Math.random()-0.5)*40;ctx.lineTo(lx,i*60+Math.random()*40)}
+    ctx.stroke();ctx.lineWidth=1;
+  }
+
+  ctx.restore(); // sarsinti
+
+  // glitch
+  if(sayac%240<3){try{var gy=Math.random()*YUK|0,gh=2+(Math.random()*6)|0;var sat=ctx.getImageData(0,gy,GEN,gh);ctx.putImageData(sat,(Math.random()-0.5)*8|0,gy)}catch(e){}}
+
+  // ekran katmanlari
+  if(durum=="menu")katCiz("THE LOST KNIGHT","press ENTER to start\nor tap the screen\n\nQ: switch weapon | SPACE: attack","#d0c090");
+  if(durum=="oldu")katCiz("YOU DIED!",tAltin+" gold collected\npress ENTER to retry","#d04040");
+  if(durum=="gecti")katCiz("STAGE CLEAR!","press ENTER to continue","#60c060");
+  if(durum=="bitti")katCiz("VICTORY!","you defeated the dark knight!\ntotal "+tAltin+" gold\npress ENTER to play again","#e0b030");
+}
+
+function katCiz(baslik,aciklama,renk){
+  ctx.fillStyle="rgba(8,6,16,0.82)";ctx.fillRect(0,0,GEN,YUK);
+  ctx.font="bold 22px monospace";ctx.textAlign="center";
+  ctx.fillStyle="rgba(0,0,0,0.5)";ctx.fillText(baslik,GEN/2+2,YUK/2-32);
+  ctx.fillStyle=renk;ctx.shadowColor=renk;ctx.shadowBlur=16;ctx.fillText(baslik,GEN/2,YUK/2-34);ctx.shadowBlur=0;
+  ctx.font="11px monospace";var blink=Math.sin(sayac*0.06)*0.3+0.5;ctx.fillStyle="rgba(255,255,255,"+blink+")";
+  var satirlar=aciklama.split("\n");for(var i=0;i<satirlar.length;i++)ctx.fillText(satirlar[i],GEN/2,YUK/2+8+i*18);
+  if(sayac%60<40){ctx.fillStyle="rgba(255,255,255,0.12)";ctx.font="9px monospace";ctx.fillText("▶ PRESS START ◀",GEN/2,YUK/2+90)}
+}
+
+// ===================== SES =====================
+// ===================== GELISMIS MUZIK MOTORU =====================
+// her bolum icin cok katmanli atmosferik muzik
+// capraz gecis (crossfade) sistemi
+// bolum 2 dinamik hava degisimi
+// boss karsilasma muzigi
+// menu, gecis, olum ekranlari icin ozel temalar
+
+var muzikAcik=false,audioCtx=null;
+var NOTALAR={"c2":65.41,"d2":73.42,"e2":82.41,"f2":87.31,"g2":98,"a2":110,"b2":123.47,"c3":130.81,"d3":146.83,"e3":164.81,"f3":174.61,"g3":196,"a3":220,"b3":246.94,"c4":261.63,"d4":293.66,"e4":329.63,"f4":349.23,"g4":392,"a4":440,"b4":493.88,"c5":523.25,"d5":587.33,"e5":659.25,"f5":698.46,"g5":783.99,"a5":880,"b5":987.77,"c6":1046.5,"_":0};
+
+// -- katman sistemi: her bolum birden fazla ses katmani --
+// her katmanin kendi gain node'u var, crossfade icin bagimsiz kontrol
+var katmanlar = []; // aktif ses katmanlari [{gain, sonrakiZaman, bolumIdx, katmanTip}]
+var aktifBolumIdx = -1;
+var crossfadeSuresi = 2.5; // saniye
+var bossModuAktif = false;
+
+// nota frekansi hesapla (daha genis aralik icin)
+function nFrek(nota){return NOTALAR[nota]||0}
+
+// -- BOLUM MUZIK TANIMLARI --
+// her bolumun birden fazla katmani var:
+// melodi, harmoni, bas, arpej, ritim, pad (atmosfer)
+
+var bolumMuzikleri = [
+  // ====== BOLUM 1: KARANLIK ORMAN - gizemli, merakli ======
+  {
+    tempo: 130,
+    katmanlar: {
+      // ana melodi - hafif melankolik ama maceraci
+      melodi: {dalga:"square", ses:0.12, notalar:[
+        ["e4",2],["g4",1],["a4",1],["b4",2],["a4",1],["g4",1],
+        ["e4",1],["d4",1],["e4",2],["_",2],
+        ["g4",2],["a4",1],["b4",1],["c5",2],["b4",1],["a4",1],
+        ["g4",1],["e4",1],["d4",2],["_",2],
+        ["c4",1],["d4",1],["e4",2],["g4",2],["a4",2],
+        ["b4",1],["a4",1],["g4",1],["e4",1],["d4",2],["_",2],
+        ["e4",1],["f4",1],["g4",2],["e4",2],
+        ["d4",1],["c4",1],["d4",2],["e4",4]
+      ]},
+      // harmoni - melodi ile birlikte calan ikinci ses
+      harmoni: {dalga:"triangle", ses:0.06, notalar:[
+        ["c4",4],["e4",4],["c4",4],["_",4],
+        ["e4",4],["g4",4],["d4",4],["_",4],
+        ["a3",4],["c4",4],["e4",4],["d4",4],
+        ["c4",4],["b3",4],["c4",4],["_",4]
+      ]},
+      // derin bas - yercekimi hissi
+      bas: {dalga:"triangle", ses:0.16, notalar:[
+        ["c2",4],["c3",4],["a2",4],["a2",4],
+        ["e2",4],["g2",4],["d2",4],["d3",4],
+        ["a2",4],["c3",4],["e2",4],["g2",4],
+        ["c2",4],["g2",4],["c3",2],["c2",2]
+      ]},
+      // arpej - orman sivrisinek gibi donen notalar
+      arpej: {dalga:"sawtooth", ses:0.03, notalar:["e4","g4","b4","g4","a4","e4","g4","e4"]},
+      // pad - uzun sureli atmosfer (gizem)
+      pad: {dalga:"sine", ses:0.08, notalar:[
+        ["e3",16],["a3",16],["c4",16],["g3",16]
+      ]},
+      // ritim - hafif, ormanda yuruyor gibi
+      ritim: {kick:true, hihat:true, kickHer:4, hihatHer:2, kickSes:0.12, hihatSes:0.04}
+    }
+  },
+
+  // ====== BOLUM 2: GUNESLI BASLAR, FIRTINA ILE BITER ======
+  // normalde parlak ve umutlu
+  {
+    tempo: 138,
+    katmanlar: {
+      melodi: {dalga:"square", ses:0.13, notalar:[
+        ["c5",1],["d5",1],["e5",2],["g5",1],["e5",1],["d5",2],
+        ["c5",1],["b4",1],["a4",2],["g4",2],["_",2],
+        ["a4",1],["b4",1],["c5",2],["d5",1],["c5",1],["b4",2],
+        ["a4",1],["g4",1],["a4",2],["_",4],
+        ["e5",1],["d5",1],["c5",1],["b4",1],["a4",2],["g4",2],
+        ["a4",1],["c5",1],["b4",2],["a4",2],["g4",4]
+      ]},
+      harmoni: {dalga:"triangle", ses:0.07, notalar:[
+        ["e4",4],["g4",4],["c4",4],["_",4],
+        ["f4",4],["a4",4],["d4",4],["_",4],
+        ["c4",4],["e4",4],["g4",4],["e4",4]
+      ]},
+      bas: {dalga:"triangle", ses:0.15, notalar:[
+        ["c3",4],["c3",4],["a2",4],["g2",4],
+        ["f2",4],["f3",4],["d2",4],["g2",4],
+        ["c2",4],["e2",4],["g2",4],["c3",4]
+      ]},
+      arpej: {dalga:"sawtooth", ses:0.035, notalar:["c4","e4","g4","c5","g4","e4","c4","e4"]},
+      pad: {dalga:"sine", ses:0.09, notalar:[
+        ["c4",16],["f4",16],["g4",16],["c4",16]
+      ]},
+      ritim: {kick:true, hihat:true, kickHer:4, hihatHer:2, kickSes:0.14, hihatSes:0.05}
+    },
+    // firtina varyanti - ayni yapi ama karanlik tonlarda
+    firtinaVaryanti: {
+      melodi: {dalga:"square", ses:0.10, notalar:[
+        ["e4",2],["_",1],["e4",1],["f4",2],["e4",2],
+        ["d4",2],["c4",2],["b3",4],["_",4],
+        ["c4",2],["d4",1],["e4",1],["f4",2],["e4",1],["d4",1],
+        ["c4",2],["b3",2],["a3",4],["_",4],
+        ["a3",2],["c4",2],["e4",2],["d4",2],
+        ["c4",2],["b3",2],["a3",4],["_",4]
+      ]},
+      harmoni: {dalga:"triangle", ses:0.05, notalar:[
+        ["a3",8],["f3",8],["c4",8],["_",8],
+        ["e3",8],["a3",8],["c4",4],["b3",4]
+      ]},
+      bas: {dalga:"triangle", ses:0.18, notalar:[
+        ["a2",4],["a2",4],["f2",4],["e2",4],
+        ["a2",4],["c3",4],["e2",4],["a2",4]
+      ]},
+      arpej: {dalga:"sawtooth", ses:0.025, notalar:["a3","c4","e4","a3","c4","e4","a3","c4"]},
+      pad: {dalga:"sine", ses:0.10, notalar:[
+        ["a3",16],["e3",16],["f3",16],["a3",16]
+      ]},
+      ritim: {kick:true, hihat:true, kickHer:2, hihatHer:1, kickSes:0.18, hihatSes:0.06}
+    }
+  },
+
+  // ====== BOLUM 3: KAOS - agresif, tehditkar ======
+  {
+    tempo: 155,
+    katmanlar: {
+      melodi: {dalga:"square", ses:0.14, notalar:[
+        ["e5",1],["d5",1],["c5",1],["b4",1],["a4",2],["_",1],["a4",1],
+        ["b4",1],["c5",1],["d5",1],["e5",1],["f5",2],["e5",2],
+        ["d5",1],["c5",1],["b4",1],["a4",1],["g4",2],["a4",2],
+        ["b4",2],["_",1],["b4",1],["c5",2],["d5",2],
+        ["e5",1],["d5",1],["c5",2],["b4",2],["a4",4],
+        ["_",2],["a4",1],["b4",1],["c5",1],["d5",1],["e5",2],["d5",2]
+      ]},
+      harmoni: {dalga:"sawtooth", ses:0.06, notalar:[
+        ["a3",4],["c4",4],["e4",4],["a3",4],
+        ["f3",4],["a3",4],["c4",4],["e4",4],
+        ["d4",4],["f4",4],["a3",4],["c4",4]
+      ]},
+      bas: {dalga:"sawtooth", ses:0.18, notalar:[
+        ["a2",2],["a2",2],["a3",2],["a2",2],
+        ["f2",2],["f2",2],["f3",2],["f2",2],
+        ["e2",2],["e2",2],["e3",2],["e2",2],
+        ["a2",2],["g2",2],["f2",2],["e2",2]
+      ]},
+      arpej: {dalga:"square", ses:0.04, notalar:["a4","c5","e5","a5","e5","c5","a4","e4"]},
+      pad: {dalga:"sawtooth", ses:0.06, notalar:[
+        ["a3",8],["e3",8],["f3",8],["d3",8]
+      ]},
+      ritim: {kick:true, hihat:true, kickHer:2, hihatHer:1, kickSes:0.20, hihatSes:0.07}
+    },
+    // boss karsilasma muzigi!
+    bossVaryanti: {
+      melodi: {dalga:"square", ses:0.15, notalar:[
+        ["a4",1],["_",1],["a4",1],["c5",1],["a4",1],["_",1],["g4",1],["a4",1],
+        ["f4",2],["e4",1],["f4",1],["g4",2],["a4",2],
+        ["_",1],["a4",1],["b4",1],["c5",1],["d5",2],["c5",1],["b4",1],
+        ["a4",2],["g4",2],["a4",4],
+        ["e5",1],["_",1],["e5",1],["d5",1],["c5",1],["b4",1],["a4",2],
+        ["g4",1],["a4",1],["b4",2],["c5",2],["a4",4]
+      ]},
+      harmoni: {dalga:"sawtooth", ses:0.08, notalar:[
+        ["a3",4],["f3",4],["e3",4],["a3",4],
+        ["d3",4],["f3",4],["a3",4],["e3",4],
+        ["c4",4],["a3",4],["e3",4],["a3",4]
+      ]},
+      bas: {dalga:"sawtooth", ses:0.22, notalar:[
+        ["a2",1],["a2",1],["_",1],["a2",1],["a3",1],["a2",1],["_",1],["a2",1],
+        ["f2",1],["f2",1],["_",1],["f2",1],["f3",1],["f2",1],["_",1],["f2",1],
+        ["e2",1],["e2",1],["_",1],["e2",1],["e3",1],["e2",1],["_",1],["e2",1],
+        ["a2",1],["a2",1],["_",1],["a2",1],["a3",2],["a2",2]
+      ]},
+      arpej: {dalga:"square", ses:0.05, notalar:["a4","e5","a5","e5","c5","a4","e4","a4"]},
+      pad: {dalga:"sawtooth", ses:0.07, notalar:[
+        ["a2",8],["e3",8],["a2",8],["d3",8]
+      ]},
+      ritim: {kick:true, hihat:true, kickHer:1, hihatHer:1, kickSes:0.22, hihatSes:0.08}
+    }
+  },
+
+  // ====== MENU MUZIGI - nostaljik, davetkar ======
+  {
+    tempo: 100,
+    katmanlar: {
+      melodi: {dalga:"square", ses:0.10, notalar:[
+        ["e4",3],["g4",1],["a4",2],["g4",2],
+        ["e4",2],["d4",2],["c4",4],
+        ["d4",2],["e4",2],["g4",3],["e4",1],
+        ["d4",4],["_",4],
+        ["c4",2],["e4",2],["g4",2],["a4",2],
+        ["b4",3],["a4",1],["g4",4],
+        ["e4",2],["d4",2],["c4",3],["d4",1],
+        ["e4",8]
+      ]},
+      harmoni: {dalga:"sine", ses:0.06, notalar:[
+        ["c3",8],["a3",8],["g3",8],["_",8],
+        ["c3",8],["e3",8],["g3",8],["c4",8]
+      ]},
+      bas: {dalga:"triangle", ses:0.12, notalar:[
+        ["c2",8],["a2",8],["g2",8],["c2",8],
+        ["f2",8],["g2",8],["c2",8],["c3",8]
+      ]},
+      arpej: {dalga:"sine", ses:0.03, notalar:["c4","e4","g4","c5"]},
+      pad: {dalga:"sine", ses:0.10, notalar:[
+        ["c3",32],["g3",32]
+      ]},
+      ritim: {kick:false, hihat:false, kickHer:8, hihatHer:4, kickSes:0.06, hihatSes:0.02}
+    }
+  },
+
+  // ====== BOLUM GECIS / ZAFER MUZIGI ======
+  {
+    tempo: 150,
+    katmanlar: {
+      melodi: {dalga:"square", ses:0.14, notalar:[
+        ["c5",1],["d5",1],["e5",2],["g5",2],
+        ["e5",1],["d5",1],["c5",2],["_",2],
+        ["g4",1],["a4",1],["b4",1],["c5",1],["d5",2],["e5",2],
+        ["c5",2],["b4",2],["c5",4]
+      ]},
+      harmoni: {dalga:"triangle", ses:0.08, notalar:[
+        ["e4",4],["g4",4],["c5",4],["_",4],
+        ["e4",4],["g4",4],["c5",4],["e5",4]
+      ]},
+      bas: {dalga:"triangle", ses:0.14, notalar:[
+        ["c3",4],["g3",4],["c3",4],["g3",4],
+        ["f3",4],["g3",4],["c3",4],["c4",4]
+      ]},
+      arpej: {dalga:"sawtooth", ses:0.04, notalar:["c4","e4","g4","c5","e5","c5","g4","e4"]},
+      pad: {dalga:"sine", ses:0.08, notalar:[["c4",32]]},
+      ritim: {kick:true, hihat:true, kickHer:4, hihatHer:2, kickSes:0.15, hihatSes:0.05}
+    }
+  },
+
+  // ====== OLUM EKRANI MUZIGI - huzunlu ======
+  {
+    tempo: 80,
+    katmanlar: {
+      melodi: {dalga:"triangle", ses:0.10, notalar:[
+        ["e4",4],["d4",4],["c4",4],["b3",4],
+        ["a3",4],["_",4],["c4",4],["b3",4],
+        ["a3",8],["_",8]
+      ]},
+      harmoni: {dalga:"sine", ses:0.05, notalar:[
+        ["a3",8],["f3",8],["e3",8],["a3",8]
+      ]},
+      bas: {dalga:"sine", ses:0.10, notalar:[
+        ["a2",8],["f2",8],["e2",8],["a2",8]
+      ]},
+      arpej: {dalga:"sine", ses:0.02, notalar:["a3","c4","e4","c4"]},
+      pad: {dalga:"sine", ses:0.12, notalar:[
+        ["a2",32]
+      ]},
+      ritim: {kick:false, hihat:false, kickHer:8, hihatHer:8, kickSes:0.0, hihatSes:0.0}
+    }
+  }
+];
+
+// -- Ses cikis yapisi --
+// Her muzik "sahnesi" icin ayri gain zinciri
+// masterGain -> muzikGain -> (katman gain'leri)
+// crossfade: eski sahnenin gain'i azalirken yenininki artar
+
+var masterGain = null;
+var muzikSahneleri = []; // {gain, sonrakiZaman, muzikIdx, aktif}
+var aktifSahneIdx = -1;
+
+function audioBaslat(){
+  if(audioCtx)return;
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  masterGain=audioCtx.createGain();
+  masterGain.gain.value=0.35;
+  masterGain.connect(audioCtx.destination);
+}
+
+// temel ses cikis fonksiyonlari
+function notaCal(f,b,s,t,v,hedef){
+  if(f==0||!audioCtx)return;
+  var os=audioCtx.createOscillator(),g=audioCtx.createGain();
+  os.type=t;os.frequency.value=f;
+  // ADSR - daha yumusak zarf
+  g.gain.setValueAtTime(0,b);
+  g.gain.linearRampToValueAtTime(v,b+0.025);
+  g.gain.setValueAtTime(v*0.85,b+0.05);
+  g.gain.linearRampToValueAtTime(v*0.4,b+s*0.6);
+  g.gain.linearRampToValueAtTime(0,b+s-0.01);
+  os.connect(g);g.connect(hedef||masterGain);
+  os.start(b);os.stop(b+s);
+}
+
+function padCal(f,b,s,t,v,hedef){
+  // pad: cok yavas attack/release, uzun ses
+  if(f==0||!audioCtx)return;
+  var os=audioCtx.createOscillator(),g=audioCtx.createGain();
+  os.type=t;os.frequency.value=f;
+  g.gain.setValueAtTime(0,b);
+  g.gain.linearRampToValueAtTime(v,b+s*0.15); // yavas giris
+  g.gain.setValueAtTime(v*0.9,b+s*0.5);
+  g.gain.linearRampToValueAtTime(0,b+s-0.1); // yavas cikis
+  os.connect(g);g.connect(hedef||masterGain);
+  os.start(b);os.stop(b+s);
+}
+
+function vurusCal(b,t,v,hedef){
+  if(!audioCtx)return;
+  var bs=audioCtx.sampleRate*0.08,bf=audioCtx.createBuffer(1,bs,audioCtx.sampleRate),d=bf.getChannelData(0);
+  for(var i=0;i<bs;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/bs,t=="kick"?3:8);
+  var k=audioCtx.createBufferSource();k.buffer=bf;
+  var g=audioCtx.createGain();g.gain.value=v||0.12;
+  k.connect(g);g.connect(hedef||masterGain);k.start(b);
+  if(t=="kick"){var os=audioCtx.createOscillator(),og=audioCtx.createGain();os.frequency.setValueAtTime(150,b);os.frequency.exponentialRampToValueAtTime(30,b+0.1);og.gain.setValueAtTime(v*0.8,b);og.gain.linearRampToValueAtTime(0,b+0.12);os.connect(og);og.connect(hedef||masterGain);os.start(b);os.stop(b+0.15)}
+}
+
+// -- Sahne olustur: bir muzik parcasinin tum katmanlarini planla --
+function sahnePlanla(muzikIdx, varyant) {
+  if(!muzikAcik||!audioCtx) return null;
+
+  var mDef = bolumMuzikleri[muzikIdx];
+  if(!mDef) return null;
+  var kat = varyant || mDef.katmanlar;
+  var beat = 60 / mDef.tempo;
+
+  // bu sahne icin gain node
+  var sahneGain = audioCtx.createGain();
+  sahneGain.gain.value = 0; // crossfade icin 0'dan baslayacak
+  sahneGain.connect(masterGain);
+
+  var simdi = audioCtx.currentTime;
+  var sahne = {gain: sahneGain, sonrakiZaman: simdi + 0.15, muzikIdx: muzikIdx, aktif: true};
+
+  planlaKatmanlar(sahne, kat, beat);
+  return sahne;
+}
+
+function planlaKatmanlar(sahne, kat, beat) {
+  var t = sahne.sonrakiZaman;
+  var hedef = sahne.gain;
+
+  // melodi
+  if(kat.melodi) {
+    var tM = t;
+    for(var i=0;i<kat.melodi.notalar.length;i++){
+      var n=kat.melodi.notalar[i],f=nFrek(n[0]),s=n[1]*beat;
+      notaCal(f,tM,s*0.9,kat.melodi.dalga,kat.melodi.ses,hedef);
+      tM+=s;
+    }
+    sahne.parcaSuresi = tM - t;
+  }
+
+  // harmoni
+  if(kat.harmoni) {
+    var tH = t;
+    for(var i=0;i<kat.harmoni.notalar.length;i++){
+      var n=kat.harmoni.notalar[i],f=nFrek(n[0]),s=n[1]*beat;
+      notaCal(f,tH,s*0.85,kat.harmoni.dalga,kat.harmoni.ses,hedef);
+      tH+=s;
+    }
+  }
+
+  // bas
+  if(kat.bas) {
+    var tB = t;
+    for(var i=0;i<kat.bas.notalar.length;i++){
+      var n=kat.bas.notalar[i],f=nFrek(n[0]),s=n[1]*beat;
+      notaCal(f,tB,s*0.85,kat.bas.dalga,kat.bas.ses,hedef);
+      tB+=s;
+    }
+  }
+
+  // arpej (dongusel)
+  if(kat.arpej && sahne.parcaSuresi) {
+    var tA=t, aC=0;
+    while(tA < t + sahne.parcaSuresi) {
+      var aN=kat.arpej.notalar[aC%kat.arpej.notalar.length];
+      var f=nFrek(aN);
+      notaCal(f,tA,beat*0.45,kat.arpej.dalga,kat.arpej.ses,hedef);
+      tA+=beat*0.5; aC++;
+    }
+  }
+
+  // pad (uzun atmosferik sesler)
+  if(kat.pad) {
+    var tP = t;
+    for(var i=0;i<kat.pad.notalar.length;i++){
+      var n=kat.pad.notalar[i],f=nFrek(n[0]),s=n[1]*beat;
+      padCal(f,tP,s,kat.pad.dalga,kat.pad.ses,hedef);
+      tP+=s;
+    }
+  }
+
+  // ritim
+  if(kat.ritim && sahne.parcaSuresi) {
+    var tR=t, vC=0;
+    while(tR < t + sahne.parcaSuresi) {
+      if(kat.ritim.kick && vC%kat.ritim.kickHer==0) vurusCal(tR,"kick",kat.ritim.kickSes,hedef);
+      if(kat.ritim.hihat && vC%kat.ritim.hihatHer==1) vurusCal(tR,"hihat",kat.ritim.hihatSes,hedef);
+      tR+=beat; vC++;
+    }
+  }
+
+  sahne.sonrakiZaman = t + (sahne.parcaSuresi || 16*beat);
+}
+
+// -- Crossfade: eski sahneyi sondur, yeni sahneyi ac --
+function crossfadeYap(yeniSahne) {
+  if(!audioCtx) return;
+  var simdi = audioCtx.currentTime;
+
+  // eski sahneleri sonlandirmaya basla
+  for(var i=0;i<muzikSahneleri.length;i++) {
+    var eski = muzikSahneleri[i];
+    if(eski.aktif) {
+      eski.aktif = false;
+      // yavasca kapat
+      try {
+        eski.gain.gain.cancelScheduledValues(simdi);
+        eski.gain.gain.setValueAtTime(eski.gain.gain.value, simdi);
+        eski.gain.gain.linearRampToValueAtTime(0, simdi + crossfadeSuresi);
+      } catch(e){}
+      // crossfade bittikten sonra disconnect et
+      (function(g){setTimeout(function(){try{g.disconnect()}catch(e){}}, (crossfadeSuresi+1)*1000)})(eski.gain);
+    }
+  }
+
+  // yeni sahneyi ac
+  if(yeniSahne) {
+    yeniSahne.aktif = true;
+    try {
+      yeniSahne.gain.gain.setValueAtTime(0, simdi);
+      yeniSahne.gain.gain.linearRampToValueAtTime(1, simdi + crossfadeSuresi);
+    } catch(e){}
+    muzikSahneleri.push(yeniSahne);
+  }
+
+  // eski oluleri temizle
+  muzikSahneleri = muzikSahneleri.filter(function(s){return s.aktif});
+}
+
+// -- Bolum muzigi baslat (crossfade ile) --
+var mevcutMuzikTipi = ""; // "bolum0", "bolum1", "bolum1_firtina", "bolum2", "bolum2_boss", "menu", "gecis", "olum"
+
+function muzikDegistir(yeniTip) {
+  if(yeniTip == mevcutMuzikTipi) return; // zaten caliyorsa degistirme
+  if(!muzikAcik || !audioCtx) return;
+  mevcutMuzikTipi = yeniTip;
+
+  var yeniSahne = null;
+  if(yeniTip == "bolum0") yeniSahne = sahnePlanla(0);
+  else if(yeniTip == "bolum1") yeniSahne = sahnePlanla(1);
+  else if(yeniTip == "bolum1_firtina") yeniSahne = sahnePlanla(1, bolumMuzikleri[1].firtinaVaryanti);
+  else if(yeniTip == "bolum2") yeniSahne = sahnePlanla(2);
+  else if(yeniTip == "bolum2_boss") yeniSahne = sahnePlanla(2, bolumMuzikleri[2].bossVaryanti);
+  else if(yeniTip == "menu") yeniSahne = sahnePlanla(3);
+  else if(yeniTip == "gecis") yeniSahne = sahnePlanla(4);
+  else if(yeniTip == "olum") yeniSahne = sahnePlanla(5);
+
+  crossfadeYap(yeniSahne);
+}
+
+// -- Muzik dongusunu kontrol et --
+function muzikGunc() {
+  if(!muzikAcik || !audioCtx) return;
+
+  // aktif sahnenin muzigi bitmek uzereyse yeniden planla (loop)
+  for(var i=0;i<muzikSahneleri.length;i++) {
+    var s = muzikSahneleri[i];
+    if(!s.aktif) continue;
+    if(audioCtx.currentTime > s.sonrakiZaman - 2) {
+      // tekrar planla
+      var mDef = bolumMuzikleri[s.muzikIdx];
+      if(!mDef) continue;
+      var beat = 60 / mDef.tempo;
+
+      // hangi katman setini kullan
+      var kat = mDef.katmanlar;
+      if(mevcutMuzikTipi == "bolum1_firtina" && mDef.firtinaVaryanti) kat = mDef.firtinaVaryanti;
+      if(mevcutMuzikTipi == "bolum2_boss" && mDef.bossVaryanti) kat = mDef.bossVaryanti;
+
+      planlaKatmanlar(s, kat, beat);
+    }
+  }
+
+  // -- DINAMIK MUZIK GECISLERI --
+  // durum bazinda otomatik gecis
+  if(durum == "menu") {
+    muzikDegistir("menu");
+  }
+  else if(durum == "oldu") {
+    muzikDegistir("olum");
+  }
+  else if(durum == "gecti" || durum == "bitti") {
+    muzikDegistir("gecis");
+  }
+  else if(durum == "oyna") {
+    if(mB == 0) {
+      muzikDegistir("bolum0");
+    }
+    else if(mB == 1) {
+      // bolum 2: hava durumuna gore muzik
+      if(havaDurumu >= 3) muzikDegistir("bolum1_firtina");
+      else muzikDegistir("bolum1");
+    }
+    else if(mB == 2) {
+      // bolum 3: boss aktif mi
+      if(bossAktif && boss && !boss.oldu) muzikDegistir("bolum2_boss");
+      else muzikDegistir("bolum2");
+    }
+  }
+}
+
+function muzikSifirla() {
+  mevcutMuzikTipi = ""; // zorla yeniden baslat
+}
+
+// ses butonu
+document.getElementById("sesBtn").addEventListener("click",function(e){
+  e.stopPropagation();
+  if(!muzikAcik){
+    audioBaslat();muzikAcik=true;
+    this.style.color="rgba(100,200,100,0.7)";
+    mevcutMuzikTipi=""; // reset
+  } else {
+    muzikAcik=false;
+    this.style.color="rgba(255,255,255,0.25)";
+    // tum sahneleri kapat
+    for(var i=0;i<muzikSahneleri.length;i++){
+      try{muzikSahneleri[i].gain.gain.linearRampToValueAtTime(0,audioCtx.currentTime+0.5)}catch(e){}
+      muzikSahneleri[i].aktif=false;
+    }
+    mevcutMuzikTipi="";
+  }
+});
+
+// SFX - degismedi
+function sfxCal(t){
+  if(!audioCtx)audioBaslat();
+  var g=audioCtx.createGain();g.gain.value=0.25;g.connect(audioCtx.destination);
+  var ct=audioCtx.currentTime;
+  if(t=="zipla"){var os=audioCtx.createOscillator();os.type="square";os.frequency.setValueAtTime(250,ct);os.frequency.exponentialRampToValueAtTime(600,ct+0.12);var gn=audioCtx.createGain();gn.gain.setValueAtTime(0.12,ct);gn.gain.linearRampToValueAtTime(0,ct+0.15);os.connect(gn);gn.connect(g);os.start();os.stop(ct+0.15)}
+  else if(t=="altin"){var os=audioCtx.createOscillator();os.type="square";os.frequency.setValueAtTime(880,ct);os.frequency.setValueAtTime(1100,ct+0.06);os.frequency.setValueAtTime(1320,ct+0.12);var gn=audioCtx.createGain();gn.gain.setValueAtTime(0.1,ct);gn.gain.linearRampToValueAtTime(0,ct+0.2);os.connect(gn);gn.connect(g);os.start();os.stop(ct+0.2)}
+  else if(t=="vurus"){var os=audioCtx.createOscillator();os.type="sawtooth";os.frequency.setValueAtTime(200,ct);os.frequency.exponentialRampToValueAtTime(60,ct+0.2);var gn=audioCtx.createGain();gn.gain.setValueAtTime(0.18,ct);gn.gain.linearRampToValueAtTime(0,ct+0.25);os.connect(gn);gn.connect(g);os.start();os.stop(ct+0.25)}
+  else if(t=="olum"){for(var i=0;i<4;i++){var os=audioCtx.createOscillator();os.type="square";os.frequency.value=300-i*60;var gn=audioCtx.createGain();gn.gain.setValueAtTime(0.12,ct+i*0.12);gn.gain.linearRampToValueAtTime(0,ct+i*0.12+0.1);os.connect(gn);gn.connect(g);os.start(ct+i*0.12);os.stop(ct+i*0.12+0.12)}}
+  else if(t=="kilic"){var bs=audioCtx.sampleRate*0.06,bf=audioCtx.createBuffer(1,bs,audioCtx.sampleRate),d=bf.getChannelData(0);for(var i=0;i<bs;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/bs,2);var s=audioCtx.createBufferSource();s.buffer=bf;var gn=audioCtx.createGain();gn.gain.value=0.1;var f=audioCtx.createBiquadFilter();f.type="highpass";f.frequency.value=2000;s.connect(f);f.connect(gn);gn.connect(g);s.start()}
+  else if(t=="gecis"){var ns=[523.25,659.25,783.99,1046.50];for(var i=0;i<ns.length;i++){var os=audioCtx.createOscillator();os.type="square";os.frequency.value=ns[i];var gn=audioCtx.createGain();gn.gain.setValueAtTime(0.1,ct+i*0.15);gn.gain.linearRampToValueAtTime(0,ct+i*0.15+0.3);os.connect(gn);gn.connect(g);os.start(ct+i*0.15);os.stop(ct+i*0.15+0.35)}}
+}
+
+function basla(){durum="oyna";bolumYukle();oSifirla();parcalar=[];arayuzGunc();muzikSifirla()}
+function dongu(){guncelle();ciz();muzikGunc();requestAnimationFrame(dongu)}
+
+// tiklamayi hem canvas hem cerceve hem body'ye bagla
+function tiklamaIsle(){
+  if(durum=="menu")basla();
+  else if(durum=="oldu"||durum=="bitti"){mB=0;can=3;tAltin=0;mevcutSilah="kilic";basla()}
+  else if(durum=="gecti"){mB++;basla()}
+}
+cnv.addEventListener("click",tiklamaIsle);
+document.querySelector(".ekran-cerceve").addEventListener("click",tiklamaIsle);
+
+bolumYukle();arayuzGunc();dongu();
+</script>
+</body>
+</html>
